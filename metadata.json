@@ -1,0 +1,6 @@
+{
+  "name": "AI SEO Blog Writer v4",
+  "description": "An AI-powered application to help users craft SEO-optimized blog posts using transcripts, research notes, and Gemini API. The app assists in generating content, meta descriptions, and provides SEO suggestions, outputting in a WordPress-friendly HTML format.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
