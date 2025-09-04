@@ -69,17 +69,19 @@ export const ensureAdminUser = async (): Promise<void> => {
     } else {
       console.log(`Found ${adminUsers.length} admin user(s)`);
       
-      // Reset admin password to known secure password if needed
+      // Check if admin password needs to be upgraded to secure hashing
       const adminUser = adminUsers.find(u => u.username === 'admin');
-      if (adminUser) {
-        console.log('Resetting admin password to SecureAdmin123!');
+      if (adminUser && !adminUser.password.startsWith('$2b$')) {
+        console.log('Upgrading admin password to secure hash format');
         const hashedPassword = await hashPassword('SecureAdmin123!');
         const updatedAdmin: User = {
           ...adminUser,
           password: hashedPassword
         };
         await db.updateUser(updatedAdmin);
-        console.log('Admin password reset completed');
+        console.log('Admin password upgraded to secure hash');
+      } else {
+        console.log('Admin password already properly hashed, no changes needed');
       }
     }
   } catch (error) {

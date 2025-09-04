@@ -205,11 +205,7 @@ export const authenticateUser = async (username: string, password: string): Prom
     }
 
     // Verify password
-    console.log('Login attempt for user:', username);
-    console.log('Provided password:', password);
-    console.log('Stored password hash:', user.password);
     const isValidPassword = await verifyPassword(password, user.password);
-    console.log('Password valid:', isValidPassword);
     
     if (!isValidPassword) {
       recordFailedAttempt(username);
@@ -294,11 +290,7 @@ export const updateUserPassword = async (
     }
 
     // Verify old password
-    console.log('Password change attempt for user:', user.username);
-    console.log('Provided old password:', oldPassword);
-    console.log('Stored password hash:', user.password);
     const isValidOldPassword = await verifyPassword(oldPassword, user.password);
-    console.log('Old password valid:', isValidOldPassword);
     if (!isValidOldPassword) {
       return { success: false, error: 'Current password is incorrect' };
     }
