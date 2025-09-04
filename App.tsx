@@ -42,6 +42,7 @@ import { WriterProfileSelector } from './components/WriterProfileSelector';
 import { DEFAULT_TEXT_MODEL, SOCIAL_MEDIA_PLATFORMS, TITLE_MAX_LENGTH, META_TITLE_MAX_LENGTH, META_DESCRIPTION_MAX_LENGTH } from './constants';
 import { authenticateUser } from './services/userService';
 import { migrateUsersToHashedPasswords, ensureAdminUser } from './services/migrationService';
+import { initializeApiKeys } from './services/apiKeyService';
 import { saveBlogPost, deleteBlogPost } from './services/blogStorageService';
 import { getWriterProfiles, saveWriterProfiles, getSelectedWriterProfileId, setSelectedWriterProfileId } from './services/writerProfileService';
 import { TopicFinder } from './components/TopicFinder';
@@ -1716,6 +1717,10 @@ export const App: React.FC = () => {
         await migrateUsersToHashedPasswords();
         await ensureAdminUser();
         console.log('Migration completed');
+        
+        console.log('Initializing API keys...');
+        await initializeApiKeys();
+        console.log('API keys initialized');
       } catch (error) {
         console.error('Migration failed:', error);
       }

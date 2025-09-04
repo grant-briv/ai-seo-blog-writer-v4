@@ -12,14 +12,22 @@ import {
   DEFAULT_TEXT_MODEL,
   IMAGE_GENERATION_MODEL
 } from '../constants';
+import { getGeminiApiKey } from './apiKeyService';
 
+// Initialize AI client - will be set when API key is retrieved
+let ai: GoogleGenAI | null = null;
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set. AI features will not work.");
-}
-const ai = new GoogleGenAI({ apiKey: API_KEY }); 
+const initializeAI = async (): Promise<GoogleGenAI> => {
+  if (ai) return ai;
+  
+  const apiKey = await getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error("Gemini API key not configured. Please set it in the admin settings.");
+  }
+  
+  ai = new GoogleGenAI({ apiKey });
+  return ai;
+}; 
 
 // Custom error for rate limiting
 export class RateLimitError extends Error {
@@ -131,8 +139,7 @@ export async function generateBlogPost(
   inputs: BlogInputs, 
   profileData?: WriterProfileData
 ): Promise<string> {
-  if (!API_KEY) return Promise.reject(new Error("API Key not configured. Cannot generate blog post."));
-
+  const aiClient = await initializeAI();
   const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
 
   let wordCountSystemRule = '';
@@ -223,7 +230,7 @@ Output only the HTML content for the blog body.
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'text');
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response: GenerateContentResponse = await aiClient.models.generateContent({
       model: selectedModel,
       contents: prompt,
        config: {
@@ -248,7 +255,7 @@ Output only the HTML content for the blog body.
         
         // Try to generate a conclusion if the article seems incomplete
         try {
-          const conclusionResponse = await ai.models.generateContent({
+          const conclusionResponse = await aiClient.models.generateContent({
             model: selectedModel,
             contents: `Complete this blog post with a proper conclusion. The current content ends here:
 
@@ -286,7 +293,7 @@ export async function generateImprovedHeadline(
   currentTitle: string,
   profileData?: WriterProfileData
 ): Promise<string> {
-  if (!API_KEY) return Promise.reject(new Error("API Key not configured."));
+  const aiClient = await initializeAI();
 
   const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
 
@@ -310,7 +317,7 @@ Follow these rules for the new headline:
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'headline');
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response: GenerateContentResponse = await aiClient.models.generateContent({
       model: selectedModel,
       contents: prompt,
       config: {
@@ -374,7 +381,7 @@ Generate the JSON object with the specified SEO elements based on the content an
     const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'seo');
 
     try {
-        const response: GenerateContentResponse = await ai.models.generateContent({
+        const response: GenerateContentResponse = await aiClient.models.generateContent({
             model: selectedModel,
             contents: prompt,
             config: {
@@ -408,7 +415,7 @@ Based on the content, generate one creative prompt for a feature image. The prom
 `;
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'imagePrompt');
   try {
-    const response = await ai.models.generateContent({ model: selectedModel, contents: prompt });
+    const response = await aiClient.models.generateContent({ model: selectedModel, contents: prompt });
     const text = response.text;
     if (!text) {
         throw new Error("Failed to generate image prompt idea, response was empty.");
@@ -435,7 +442,7 @@ Rewrite the prompt to incorporate the user's instructions. Output only the final
 `;
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'imagePrompt');
   try {
-    const response = await ai.models.generateContent({ model: selectedModel, contents: prompt });
+    const response = await aiClient.models.generateContent({ model: selectedModel, contents: prompt });
     const text = response.text;
     if (!text) {
         throw new Error("Failed to refine image prompt, response was empty.");
@@ -447,8 +454,9 @@ Rewrite the prompt to incorporate the user's instructions. Output only the final
 }
 
 export async function generateImageFromFinalPrompt(prompt: string): Promise<string> {
+  const aiClient = await initializeAI();
   try {
-    const response = await ai.models.generateImages({
+    const response = await aiClient.models.generateImages({
       model: IMAGE_GENERATION_MODEL,
       prompt,
       config: { numberOfImages: 1, outputMimeType: 'image/jpeg' }
@@ -491,7 +499,7 @@ Generate a JSON array with 3 distinct posts for ${platform.name}, following the 
 
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'social');
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
       model: selectedModel,
       contents: prompt,
       config: { responseMimeType: "application/json" }
@@ -527,7 +535,7 @@ Return the result as a single JSON object in the specified format.
 `;
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'keywordAnalysis');
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
       model: selectedModel,
       contents: prompt,
       config: { responseMimeType: "application/json" }
@@ -583,7 +591,7 @@ ${mainContent}
 
     const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'text');
     try {
-        const response: GenerateContentResponse = await ai.models.generateContent({
+        const response: GenerateContentResponse = await aiClient.models.generateContent({
             model: selectedModel,
             contents: prompt
         });
@@ -600,7 +608,7 @@ ${mainContent}
 
 export async function searchGoogleNews(query: string): Promise<GoogleNewsSearchResult> {
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
       model: DEFAULT_TEXT_MODEL,
       contents: `Find recent news articles and reliable sources about "${query}".
 First, provide a brief overall summary.
@@ -670,7 +678,7 @@ ARTICLE_END
 
 export async function deepResearchOnTopic(title: string, link: string, snippet: string): Promise<string> {
     try {
-        const response = await ai.models.generateContent({
+        const response = await aiClient.models.generateContent({
             model: DEFAULT_TEXT_MODEL,
             contents: `Based on the information found at the URL "${link}", please provide a detailed summary of the article titled "${title}". Focus on the key points, data, and conclusions. The initial snippet is: "${snippet}". Structure the output as a comprehensive research summary that can be used as source material for a blog post. Use markdown for formatting (headings, bullet points).`,
             config: {
@@ -712,7 +720,7 @@ export async function analyzeArticleViralPotential(article: Article): Promise<Ar
   const prompt = baseSystemInstruction + "\n\n" + userRequest;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
       model: selectedModel,
       contents: prompt,
       config: {
@@ -757,7 +765,7 @@ export async function generateTrendingQuestions(
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'keywordAnalysis');
   
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
       model: selectedModel,
       contents: prompt,
       config: {
@@ -774,7 +782,7 @@ export async function generateTrendingQuestions(
 
 export async function researchHeadlineIdea(headline: string): Promise<string> {
     try {
-        const response = await ai.models.generateContent({
+        const response = await aiClient.models.generateContent({
             model: DEFAULT_TEXT_MODEL,
             contents: `You are an expert research assistant. Your goal is to conduct a thorough analysis of a given headline topic and provide a comprehensive summary.
 
@@ -814,7 +822,7 @@ export async function researchHeadlineIdea(headline: string): Promise<string> {
 }
 
 export async function generateWebsiteContext(urls: string[]): Promise<string> {
-  const model = ai.models.generateContent;
+  const model = aiClient.models.generateContent;
 
   const summaryPromises = urls.map(url =>
     model({
@@ -876,7 +884,7 @@ ${mainContent.substring(0, 8000)}
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'internalLinking');
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
       model: selectedModel,
       contents: prompt,
       config: {
@@ -942,7 +950,7 @@ Return your findings in the specified JSON format.
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'externalLinking');
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
       model: selectedModel,
       contents: prompt,
       config: {

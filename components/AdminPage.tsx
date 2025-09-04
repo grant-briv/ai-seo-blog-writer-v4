@@ -6,6 +6,7 @@ import { SectionCard } from './SectionCard';
 import { ArrowLeftIcon, PlusCircleIcon, TrashIcon, UserGroupIcon, SaveIcon } from './Icons';
 import { getUsers, saveUsers } from '../services/userService';
 import { TextInput } from './TextInput';
+import { ApiKeyManager } from './ApiKeyManager';
 
 interface AdminPageProps {
   profiles: AiWriterProfile[];
@@ -211,6 +212,18 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
 
 // --- Main Admin Page Component ---
 export const AdminPage: React.FC<AdminPageProps> = ({ profiles, setCurrentView, currentUser }) => {
+  const [activeTab, setActiveTab] = useState<'users' | 'apikeys'>('users');
+
+  const TabButton: React.FC<{ tabId: typeof activeTab; icon: React.ReactNode; label: string; onClick: () => void }> = ({ tabId, icon, label, onClick }) => (
+    <button
+      onClick={onClick}
+      className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors
+        ${activeTab === tabId ? 'bg-sky-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'}`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 p-4 md:p-8 font-sans">
@@ -227,9 +240,32 @@ export const AdminPage: React.FC<AdminPageProps> = ({ profiles, setCurrentView, 
 
       <div className="max-w-4xl mx-auto">
         {currentUser.role === 'admin' ? (
-          <SectionCard title="User Management" icon={<UserGroupIcon className="w-6 h-6 text-sky-600"/>}>
-             <UserManagement allProfiles={profiles} />
-          </SectionCard>
+          <>
+            <nav className="flex flex-wrap items-center justify-center gap-2 mb-8 border-b border-gray-300 pb-4">
+              <TabButton 
+                tabId="users" 
+                onClick={() => setActiveTab('users')} 
+                icon={<UserGroupIcon className="w-5 h-5" />} 
+                label="User Management" 
+              />
+              <TabButton 
+                tabId="apikeys" 
+                onClick={() => setActiveTab('apikeys')} 
+                icon={<SaveIcon className="w-5 h-5" />} 
+                label="API Keys" 
+              />
+            </nav>
+
+            {activeTab === 'users' && (
+              <SectionCard title="User Management" icon={<UserGroupIcon className="w-6 h-6 text-sky-600"/>}>
+                <UserManagement allProfiles={profiles} />
+              </SectionCard>
+            )}
+
+            {activeTab === 'apikeys' && (
+              <ApiKeyManager currentUser={currentUser} />
+            )}
+          </>
         ) : (
            <p className="text-center text-gray-500 py-6">You do not have permission to view settings.</p>
         )}
