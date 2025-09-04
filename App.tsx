@@ -41,7 +41,7 @@ import { AdminPage } from './components/AdminPage';
 import { WriterProfileSelector } from './components/WriterProfileSelector';
 import { DEFAULT_TEXT_MODEL, SOCIAL_MEDIA_PLATFORMS, TITLE_MAX_LENGTH, META_TITLE_MAX_LENGTH, META_DESCRIPTION_MAX_LENGTH } from './constants';
 import { authenticateUser } from './services/userService';
-import { emergencyAdminReset, validatePasswordStrength } from './services/authService';
+import { validatePasswordStrength } from './services/authService';
 import { migrateUsersToHashedPasswords, ensureAdminUser } from './services/migrationService';
 import { initializeApiKeys } from './services/apiKeyService';
 import { saveBlogPost, deleteBlogPost } from './services/blogStorageService';
@@ -76,12 +76,7 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [showEmergencyReset, setShowEmergencyReset] = useState(false);
-  const [resetPassword, setResetPassword] = useState('');
-  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
-  const [resetCode, setResetCode] = useState('');
-  const [resetError, setResetError] = useState('');
-  const [resetSuccess, setResetSuccess] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,106 +101,38 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
     }
   };
 
-  const handleEmergencyReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setResetError('');
-    setResetSuccess('');
-
-    if (resetPassword !== resetConfirmPassword) {
-      setResetError('Passwords do not match');
-      return;
-    }
-
-    const validation = validatePasswordStrength(resetPassword);
-    if (!validation.isValid) {
-      setResetError(validation.errors.join('. '));
-      return;
-    }
-
-    try {
-      const result = await emergencyAdminReset(resetPassword, resetCode);
-      if (result.success) {
-        setResetSuccess('Admin password reset successfully! You can now login with the new password.');
-        setTimeout(() => {
-          setShowEmergencyReset(false);
-          setResetPassword('');
-          setResetConfirmPassword('');
-          setResetCode('');
-          setResetSuccess('');
-        }, 3000);
-      } else {
-        setResetError(result.error || 'Reset failed');
-      }
-    } catch (error) {
-      console.error('Emergency reset error:', error);
-      setResetError('Reset failed. Please try again.');
-    }
-  };
-
-  if (showEmergencyReset) {
+  if (showForgotPassword) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 space-y-6">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-red-600 mb-4">Emergency Admin Reset</h1>
-            <p className="text-gray-600 text-sm">Use this only if you cannot access the admin account</p>
+            <h1 className="text-3xl font-bold text-sky-600 mb-4">Password Reset</h1>
+            <p className="text-gray-600">Contact your system administrator to reset your password</p>
           </div>
-          <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 px-4 py-3 rounded-lg text-sm" role="alert">
-            <p><strong>Emergency Reset Code:</strong> <code>EMERGENCY_RESET_2024</code></p>
-            <p className="mt-2 text-xs">This is a demo feature. In production, this would require secure verification.</p>
+          <div className="bg-blue-50 border border-blue-300 text-blue-800 px-4 py-3 rounded-lg text-sm" role="alert">
+            <p><strong>For Security:</strong> Password resets must be performed by an administrator.</p>
+            <p className="mt-2">Please contact your system administrator with:</p>
+            <ul className="mt-2 ml-4 list-disc text-xs">
+              <li>Your username</li>
+              <li>Reason for password reset</li>
+              <li>Identity verification information</li>
+            </ul>
           </div>
-          <form onSubmit={handleEmergencyReset} className="space-y-4">
-            <TextInput
-              label="Reset Code"
-              name="resetCode"
-              value={resetCode}
-              onChange={(e) => setResetCode(e.target.value)}
-              placeholder="Enter emergency reset code"
-              isRequired
-            />
-            <TextInput
-              label="New Admin Password"
-              name="resetPassword"
-              type="password"
-              value={resetPassword}
-              onChange={(e) => setResetPassword(e.target.value)}
-              placeholder="Enter new secure password"
-              isRequired
-            />
-            <TextInput
-              label="Confirm New Password"
-              name="resetConfirmPassword"
-              type="password"
-              value={resetConfirmPassword}
-              onChange={(e) => setResetConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
-              isRequired
-            />
-            <div className="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded text-xs">
-              <strong>Password Requirements:</strong>
-              <ul className="mt-1 ml-4 list-disc">
-                <li>At least 8 characters long</li>
-                <li>Include uppercase and lowercase letters</li>
-                <li>Include at least one number</li>
-                <li>Include at least one special character</li>
-              </ul>
+          <div className="space-y-4">
+            <div className="text-center text-sm text-gray-600">
+              <p><strong>Admin Contact Methods:</strong></p>
+              <p className="mt-2">• Internal support ticket system</p>
+              <p>• Direct communication with IT department</p>
+              <p>• Secure authentication via existing channels</p>
             </div>
-            {resetError && <p className="text-red-500 text-sm text-center">{resetError}</p>}
-            {resetSuccess && <p className="text-green-600 text-sm text-center">{resetSuccess}</p>}
-            <div className="flex space-x-3">
-              <Button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white">
-                Reset Admin Password
-              </Button>
-              <Button 
-                type="button" 
-                onClick={() => setShowEmergencyReset(false)} 
-                variant="secondary" 
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
+            <Button 
+              type="button" 
+              onClick={() => setShowForgotPassword(false)} 
+              className="w-full bg-sky-600 hover:bg-sky-700 text-white"
+            >
+              Back to Login
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -254,10 +181,10 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
         <div className="text-center">
           <button
             type="button"
-            onClick={() => setShowEmergencyReset(true)}
-            className="text-sm text-red-600 hover:text-red-800 underline"
+            onClick={() => setShowForgotPassword(true)}
+            className="text-sm text-sky-600 hover:text-sky-800 underline"
           >
-            Forgot admin password? Emergency Reset
+            Forgot your password?
           </button>
         </div>
       </div>

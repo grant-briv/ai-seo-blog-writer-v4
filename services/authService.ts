@@ -400,16 +400,70 @@ export const adminResetUserPassword = async (
 };
 
 /**
- * Emergency admin password reset (when no admin access available)
+ * Generate a secure password reset token
  */
-export const emergencyAdminReset = async (
-  newPassword: string,
-  confirmationCode: string = 'EMERGENCY_RESET_2024'
+export const generatePasswordResetToken = async (
+  adminUserId: string,
+  targetUsername: string
+): Promise<{ success: boolean; token?: string; error?: string; expiresAt?: number }> => {
+  try {
+    // Verify admin user exists and is admin
+    const db = DatabaseService.getInstance();
+    const adminUser = await db.getUserById(adminUserId);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return { success: false, error: 'Unauthorized - admin access required' };
+    }
+
+    // Get target user
+    const targetUser = await db.getUserByUsername(targetUsername.toLowerCase());
+    if (!targetUser) {
+      return { success: false, error: 'User not found' };
+    }
+
+    // Generate secure token with expiration
+    const tokenData = {
+      userId: targetUser.id,
+      username: targetUser.username,
+      adminId: adminUserId,
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + (15 * 60 * 1000), // 15 minutes
+      type: 'password_reset'
+    };
+
+    // In production, this would be signed with a secret key
+    const token = btoa(JSON.stringify(tokenData));
+    
+    console.log(`Password reset token generated for ${targetUsername} by admin ${adminUser.username}`);
+    
+    return { 
+      success: true, 
+      token,
+      expiresAt: tokenData.expiresAt
+    };
+  } catch (error) {
+    console.error('Token generation error:', error);
+    return { success: false, error: 'Failed to generate reset token' };
+  }
+};
+
+/**
+ * Reset password using a valid token
+ */
+export const resetPasswordWithToken = async (
+  token: string,
+  newPassword: string
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    // Simple confirmation code check (in production, this would be more secure)
-    if (confirmationCode !== 'EMERGENCY_RESET_2024') {
-      return { success: false, error: 'Invalid confirmation code' };
+    // Decode and validate token
+    const tokenData = JSON.parse(atob(token));
+    const now = Date.now();
+
+    if (now > tokenData.expiresAt) {
+      return { success: false, error: 'Reset token has expired' };
+    }
+
+    if (tokenData.type !== 'password_reset') {
+      return { success: false, error: 'Invalid token type' };
     }
 
     // Validate new password strength
@@ -418,26 +472,26 @@ export const emergencyAdminReset = async (
       return { success: false, error: passwordValidation.errors.join('; ') };
     }
 
-    // Get admin user
+    // Get user and update password
     const db = DatabaseService.getInstance();
-    const adminUser = await db.getUserByUsername('admin');
-    if (!adminUser) {
-      return { success: false, error: 'Admin user not found' };
+    const user = await db.getUserById(tokenData.userId);
+    if (!user) {
+      return { success: false, error: 'User not found' };
     }
 
     // Hash new password and update
     const hashedPassword = await hashPassword(newPassword);
-    const updatedUser = { ...adminUser, password: hashedPassword };
+    const updatedUser = { ...user, password: hashedPassword };
     await db.updateUser(updatedUser);
 
-    // Clear any lockouts for admin
-    clearFailedAttempts('admin');
+    // Clear any lockouts for this user
+    clearFailedAttempts(user.username);
 
-    console.log('Emergency admin password reset completed');
+    console.log(`Password reset completed for user ${user.username} via token`);
     return { success: true };
   } catch (error) {
-    console.error('Emergency password reset error:', error);
-    return { success: false, error: 'Failed to perform emergency reset' };
+    console.error('Token reset error:', error);
+    return { success: false, error: 'Invalid or corrupted reset token' };
   }
 };
 
