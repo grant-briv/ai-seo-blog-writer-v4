@@ -11,7 +11,8 @@ import {
   toggleApiKey, 
   addCustomApiKey, 
   deleteApiKey,
-  initializeApiKeys 
+  initializeApiKeys,
+  removeDuplicateApiKeys 
 } from '../services/apiKeyService';
 
 interface ApiKeyManagerProps {
@@ -38,6 +39,7 @@ export const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ currentUser }) => 
     try {
       setLoading(true);
       await initializeApiKeys();
+      await removeDuplicateApiKeys(); // Clean up any duplicates
       const keys = await getAllApiKeys();
       setApiKeys(keys);
     } catch (err) {

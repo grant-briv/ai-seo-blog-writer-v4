@@ -49,17 +49,21 @@ export const initializeApiKeys = async (): Promise<void> => {
   try {
     const existingKeys = await db.apiKeys.toArray();
     
-    // Initialize default keys if none exist
-    if (existingKeys.length === 0) {
-      const now = new Date().toISOString();
-      const keysToAdd: ApiKey[] = DEFAULT_API_KEYS.map(key => ({
-        ...key,
-        id: crypto.randomUUID(),
-        createdAt: now,
-        updatedAt: now
-      }));
-      
-      await db.apiKeys.bulkAdd(keysToAdd);
+    // Check if we need to add any default keys
+    for (const defaultKey of DEFAULT_API_KEYS) {
+      const exists = existingKeys.find(key => key.name === defaultKey.name);
+      if (!exists) {
+        const now = new Date().toISOString();
+        const newKey: ApiKey = {
+          ...defaultKey,
+          id: crypto.randomUUID(),
+          createdAt: now,
+          updatedAt: now
+        };
+        
+        await db.apiKeys.add(newKey);
+        console.log(`Added missing API key: ${defaultKey.name}`);
+      }
     }
   } catch (error) {
     console.error('Failed to initialize API keys:', error);
@@ -134,6 +138,42 @@ export const deleteApiKey = async (id: string): Promise<void> => {
     await db.apiKeys.delete(id);
   } catch (error) {
     console.error('Failed to delete API key:', error);
+    throw error;
+  }
+};
+
+export const removeDuplicateApiKeys = async (): Promise<void> => {
+  try {
+    const allKeys = await db.apiKeys.toArray();
+    const keysByName = new Map<string, ApiKey[]>();
+    
+    // Group keys by name
+    allKeys.forEach(key => {
+      if (!keysByName.has(key.name)) {
+        keysByName.set(key.name, []);
+      }
+      keysByName.get(key.name)!.push(key);
+    });
+    
+    // Remove duplicates, keeping the most recently updated
+    for (const [name, keys] of keysByName) {
+      if (keys.length > 1) {
+        console.log(`Found ${keys.length} duplicates for ${name}, removing extras...`);
+        
+        // Sort by updatedAt, keep the most recent
+        keys.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        const toKeep = keys[0];
+        const toDelete = keys.slice(1);
+        
+        // Delete duplicates
+        for (const duplicate of toDelete) {
+          await db.apiKeys.delete(duplicate.id);
+          console.log(`Removed duplicate ${name} with id ${duplicate.id}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to remove duplicate API keys:', error);
     throw error;
   }
 };
