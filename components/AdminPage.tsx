@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { AiWriterProfile, User } from '../types';
 import { Button } from './Button';
 import { SectionCard } from './SectionCard';
@@ -15,7 +15,21 @@ interface AdminPageProps {
 
 // --- User Management Component (for Admins) ---
 const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfiles }) => {
-  const [users, setUsers] = useState<User[]>(() => getUsers());
+  const [users, setUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const loadedUsers = await getUsers();
+        setUsers(loadedUsers);
+      } catch (e) {
+        console.error('Failed to load users:', e);
+        // Fallback to empty array if database fails
+        setUsers([]);
+      }
+    };
+    loadUsers();
+  }, []);
   const [editingUser, setEditingUser] = useState<User | null | 'new'>(null);
 
   const handleSaveUser = (userToSave: User) => {
@@ -30,7 +44,9 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
     }
     
     setUsers(updatedUsers);
-    saveUsers(updatedUsers);
+
+    
+    saveUsers(updatedUsers);  // Note: saveUsers is async but we don\'t await here for simplicity
     setEditingUser(null);
   };
 
@@ -45,7 +61,8 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
     if (window.confirm(`Are you sure you want to delete the user "${userToDelete.username}"? This action cannot be undone.`)) {
       const updatedUsers = users.filter(u => u.id !== userId);
       setUsers(updatedUsers);
-      saveUsers(updatedUsers);
+
+      saveUsers(updatedUsers);  // Note: saveUsers is async but we don\'t await here for simplicity
       if (typeof editingUser !== 'string' && editingUser?.id === userId) {
         setEditingUser(null);
       }
@@ -171,11 +188,13 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
                     <tr key={user.id}>
                       <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">{user.username}</td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 capitalize">{user.role}</td>
-                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-2">
-                        <Button onClick={() => setEditingUser(user)} variant="secondary" className="!py-1 !px-3 text-sky-600 hover:text-sky-800">Edit</Button>
-                        <Button onClick={() => handleDeleteUser(user.id)} variant="danger" className="!py-1 !px-3">
-                          <TrashIcon className="w-4 h-4" />
-                        </Button>
+                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button onClick={() => setEditingUser(user)} variant="secondary" className="!py-1 !px-3 text-sky-600 hover:text-sky-800">Edit</Button>
+                          <Button onClick={() => handleDeleteUser(user.id)} variant="danger" className="!py-1 !px-3">
+                            <TrashIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

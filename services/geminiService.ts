@@ -199,6 +199,14 @@ Additional Instructions from User (General - apply these alongside any AI Agent 
 ${inputs.userInstructions || "No additional general instructions."}
 
 Please generate a comprehensive blog post based on all the provided information (including any AI Agent instructions, brand voice, and knowledge base sections above if present).
+
+**COMPLETION REQUIREMENTS:**
+- The article MUST be complete from introduction to conclusion
+- End with a strong conclusion that summarizes key points
+- Include a natural call-to-action in the conclusion
+- Do NOT stop mid-sentence or leave sections incomplete
+- If approaching token limits, prioritize completing the article over adding extra content
+
 Ensure the blog post:
 1. Is directly usable in a WordPress HTML editor.
 2. Is well-structured with appropriate H2, H3, and H4 headings.
@@ -207,6 +215,8 @@ ${keywordDensityInstruction}
 5. Is written in an engaging and informative tone, consistent with any specified brand voice.
 6. Consists of paragraphs, and lists where suitable.
 ${wordCountChecklistItem ? `7. ${wordCountChecklistItem}` : ''}
+8. **MUST BE COMPLETE:** Always finish with a proper conclusion, never leave the article incomplete.
+
 Output only the HTML content for the blog body.
 `;
 
@@ -220,13 +230,52 @@ Output only the HTML content for the blog body.
         temperature: 0.7, 
         topP: 0.95,
         topK: 64,
+        maxOutputTokens: 8000, // Ensure enough tokens for complete articles
       }
     });
     const text = response.text;
     if (!text) {
         throw new Error("Failed to generate blog post content, response was empty.");
     }
-    return text.trim();
+    
+    // Check if the article appears to be incomplete (doesn't end properly)
+    const trimmedText = text.trim();
+    const hasProperEnding = trimmedText.includes('</p>') || trimmedText.includes('</li>') || trimmedText.includes('</ol>') || trimmedText.includes('</ul>');
+    const endsAbruptly = !trimmedText.endsWith('>') && !trimmedText.endsWith('.');
+    
+    if (endsAbruptly || !hasProperEnding) {
+        console.warn('Generated content may be incomplete, attempting to complete...');
+        
+        // Try to generate a conclusion if the article seems incomplete
+        try {
+          const conclusionResponse = await ai.models.generateContent({
+            model: selectedModel,
+            contents: `Complete this blog post with a proper conclusion. The current content ends here:
+
+${trimmedText.substring(-500)}
+
+Add a conclusion that:
+- Summarizes the key points
+- Includes a call-to-action
+- Properly closes the article
+- Uses proper HTML formatting
+
+Return only the conclusion HTML to append to the article.`,
+            config: {
+              temperature: 0.6,
+              maxOutputTokens: 1000,
+            }
+          });
+          
+          if (conclusionResponse.text) {
+            return trimmedText + '\n\n' + conclusionResponse.text.trim();
+          }
+        } catch (conclusionError) {
+          console.warn('Failed to generate completion:', conclusionError);
+        }
+    }
+    
+    return trimmedText;
   } catch (error) {
     handleApiError(error, `generateBlogPost with model ${selectedModel}`);
   }

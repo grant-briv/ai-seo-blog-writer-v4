@@ -41,7 +41,9 @@ import { AdminPage } from './components/AdminPage';
 import { WriterProfileSelector } from './components/WriterProfileSelector';
 import { DEFAULT_TEXT_MODEL, SOCIAL_MEDIA_PLATFORMS, TITLE_MAX_LENGTH, META_TITLE_MAX_LENGTH, META_DESCRIPTION_MAX_LENGTH } from './constants';
 import { authenticateUser } from './services/userService';
+import { migrateUsersToHashedPasswords, ensureAdminUser } from './services/migrationService';
 import { saveBlogPost, deleteBlogPost } from './services/blogStorageService';
+import { getWriterProfiles, saveWriterProfiles, getSelectedWriterProfileId, setSelectedWriterProfileId } from './services/writerProfileService';
 import { TopicFinder } from './components/TopicFinder';
 import { WriterProfileManager } from './components/WriterProfileManager';
 import { SavedBlogsManager } from './components/SavedBlogsManager';
@@ -73,14 +75,26 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const user = authenticateUser(username, password);
-    if (user) {
-      onLogin(user);
-    } else {
-      setError('Invalid username or password.');
+    try {
+      const result = await authenticateUser(username, password);
+      if (result.success && result.user && result.token) {
+        // Store secure session token
+        sessionStorage.setItem('authToken', result.token);
+        onLogin(result.user);
+      } else {
+        if (result.lockedUntil) {
+          const lockoutMinutes = Math.ceil((result.lockedUntil - Date.now()) / (1000 * 60));
+          setError(`Account temporarily locked. Try again in ${lockoutMinutes} minutes.`);
+        } else {
+          setError(result.error || 'Invalid username or password.');
+        }
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('An error occurred during login. Please try again.');
     }
   };
 
@@ -96,9 +110,10 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
           </div>
           <p className="text-gray-600">Please sign in to continue</p>
         </div>
-        <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 px-4 py-3 rounded-lg text-sm" role="alert">
-          <p><strong className="font-bold">Demonstration Only:</strong> This login is for demo purposes and is not secure. Do not use real passwords.</p>
-          <p className="mt-1">Default Admin: `admin` / `password`</p>
+        <div className="bg-green-50 border border-green-300 text-green-800 px-4 py-3 rounded-lg text-sm" role="alert">
+          <p><strong className="font-bold">Production Authentication:</strong> Uses bcrypt password hashing and secure session management.</p>
+          <p className="mt-1">Default Admin: <code>admin</code> / <code>SecureAdmin123!</code></p>
+          <p className="mt-1 text-xs"><strong>Important:</strong> Change the default password after first login.</p>
         </div>
         <form onSubmit={handleLogin} className="space-y-6">
           <TextInput
@@ -208,48 +223,57 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
 
   useEffect(() => {
-    try {
-      const storedProfiles = localStorage.getItem('aiWriterProfiles');
-      if (storedProfiles) {
-        const parsedProfiles = JSON.parse(storedProfiles) as AiWriterProfile[];
-        const updatedProfiles = parsedProfiles.map(p => ({
+    const loadProfiles = async () => {
+      try {
+        const profiles = await getWriterProfiles();
+        const updatedProfiles = profiles.map(p => ({
           ...p,
           selectedModel: p.selectedModel || DEFAULT_TEXT_MODEL,
           imagePromptInstructions: p.imagePromptInstructions || '',
-          ownerId: p.ownerId || 'admin-001', // Backfill owner for old profiles
+          ownerId: p.ownerId || 'admin-001',
           sitemapPages: p.sitemapPages || [],
           websiteContext: p.websiteContext || '',
         }));
         setWriterProfiles(updatedProfiles);
+        
+        const selectedId = await getSelectedWriterProfileId();
+        if (selectedId) {
+          setSelectedWriterProfileId(selectedId);
+        }
+      } catch (e) {
+        console.error("Error loading profiles from database:", e);
+        setError("Could not load writer profiles from database. Data might be corrupted.");
       }
-      const storedSelectedProfileId = localStorage.getItem('selectedAiWriterProfileId');
-      if (storedSelectedProfileId) {
-        setSelectedWriterProfileId(storedSelectedProfileId);
-      }
-    } catch (e) {
-      console.error("Error loading profiles from localStorage:", e);
-      setError("Could not load writer profiles from local storage. Data might be corrupted.");
-    }
+    };
+    loadProfiles();
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('aiWriterProfiles', JSON.stringify(writerProfiles));
-    } catch (e) {
-      console.error("Error saving profiles to localStorage:", e);
-      setError("Could not save writer profiles to local storage. Changes might not persist.");
+    const saveProfiles = async () => {
+      try {
+        await saveWriterProfiles(writerProfiles);
+      } catch (e) {
+        console.error("Error saving profiles to database:", e);
+        setError("Could not save writer profiles to database. Changes might not persist.");
+      }
+    };
+    if (writerProfiles.length > 0) {
+      saveProfiles();
     }
   }, [writerProfiles]);
 
   useEffect(() => {
-    if (selectedWriterProfileId) {
-      localStorage.setItem('selectedAiWriterProfileId', selectedWriterProfileId);
-    } else {
-      localStorage.removeItem('selectedAiWriterProfileId');
-    }
+    const saveSelectedProfile = async () => {
+      try {
+        await setSelectedWriterProfileId(selectedWriterProfileId);
+      } catch (e) {
+        console.error("Error saving selected profile to database:", e);
+      }
+    };
+    saveSelectedProfile();
   }, [selectedWriterProfileId]);
-  
-  const visibleWriterProfiles = useMemo(() => {
+
+    const visibleWriterProfiles = useMemo(() => {
       if (currentUser.role === 'admin') {
           return writerProfiles;
       }
@@ -679,6 +703,37 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
     }
   }, [seoSettings.focusKeywords, getActiveProfileData]);
 
+  const handleReplaceKeyword = useCallback((newKeyword: string, isAddition: boolean = false) => {
+    setSeoSettings(prev => {
+      let newFocusKeywords: string;
+      
+      if (isAddition) {
+        // Add to existing keywords
+        const existingKeywords = prev.focusKeywords.split(',').map(k => k.trim()).filter(Boolean);
+        if (!existingKeywords.includes(newKeyword)) {
+          newFocusKeywords = [...existingKeywords, newKeyword].join(', ');
+        } else {
+          // Keyword already exists
+          return prev;
+        }
+      } else {
+        // Replace the first keyword (primary focus keyword)
+        const keywordList = prev.focusKeywords.split(',').map(k => k.trim()).filter(Boolean);
+        keywordList[0] = newKeyword;
+        newFocusKeywords = keywordList.join(', ');
+      }
+
+      return {
+        ...prev,
+        focusKeywords: newFocusKeywords
+      };
+    });
+    
+    // Show confirmation message
+    const action = isAddition ? 'added to' : 'replaced in';
+    alert(`"${newKeyword}" has been ${action} your focus keywords!`);
+  }, []);
+
   const handleApproveAttempt = useCallback(() => {
     setApprovalError(null);
     setApprovalStatus('approved');
@@ -902,29 +957,42 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
   }, [mainContent, getActiveProfileData, seoSettings.externalLinkKeywords]);
 
   const handleAddExternalLink = useCallback((suggestion: ExternalLinkSuggestion) => {
-    // Check if the exact context sentence exists in the main content.
-    if (mainContent.includes(suggestion.context)) {
+    console.log('Adding external link:', { suggestion, mainContentLength: mainContent.length });
+    
+    // First, check if the anchor text exists anywhere in the content (more flexible approach)
+    if (mainContent.includes(suggestion.anchorText)) {
         const linkHtml = `<a href="${suggestion.url}" target="_blank" rel="noopener noreferrer">${suggestion.anchorText}</a>`;
         
-        // Create the new context with the link inside it.
-        // This assumes anchorText is a simple substring of context and doesn't contain HTML itself.
-        const newContext = suggestion.context.replace(suggestion.anchorText, linkHtml);
-
-        // If replacing the anchor text inside the context failed, it means the AI returned a bad anchor/context pair.
-        if (newContext === suggestion.context) {
-             alert(`Could not replace anchor text "${suggestion.anchorText}" within its context sentence. The AI may have made a mistake. Please add the link manually.`);
-             return;
-        }
-
-        // Replace the first occurrence of the original context sentence with the new one.
-        // This is safer than just replacing the anchor text, but still not perfect if the sentence is repeated.
-        const newContent = mainContent.replace(suggestion.context, newContext);
-        setMainContent(newContent);
+        // Replace the first occurrence of the anchor text with the link
+        const newContent = mainContent.replace(suggestion.anchorText, linkHtml);
         
-        // Remove the suggestion from the list once it's used
-        setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
+        if (newContent !== mainContent) {
+            setMainContent(newContent);
+            console.log('Successfully added external link');
+            
+            // Remove the suggestion from the list once it's used
+            setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
+        } else {
+            alert(`Could not replace anchor text "${suggestion.anchorText}". Please add the link manually.`);
+        }
     } else {
-        alert(`Could not find the exact context sentence: "${suggestion.context}". The content may have been edited since the suggestions were generated. Please add the link manually.`);
+        // Fallback: try to find the context sentence
+        if (mainContent.includes(suggestion.context)) {
+            const linkHtml = `<a href="${suggestion.url}" target="_blank" rel="noopener noreferrer">${suggestion.anchorText}</a>`;
+            const newContext = suggestion.context.replace(suggestion.anchorText, linkHtml);
+
+            if (newContext !== suggestion.context) {
+                const newContent = mainContent.replace(suggestion.context, newContext);
+                setMainContent(newContent);
+                console.log('Successfully added external link via context');
+                
+                setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
+            } else {
+                alert(`Could not replace anchor text "${suggestion.anchorText}" within context. Please add the link manually.`);
+            }
+        } else {
+            alert(`Could not find anchor text "${suggestion.anchorText}" or context sentence in content. The content may have been edited. Please add the link manually.`);
+        }
     }
   }, [mainContent]);
 
@@ -1058,29 +1126,58 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                         <div>
                             <h4 className="font-semibold text-gray-800 mb-2">Analysis of Your Keywords:</h4>
                             {keywordAnalysisResult.analyzedKeywords.length > 0 ? (
-                                <ul className="list-disc list-inside space-y-1 pl-1">
+                                <div className="space-y-2">
                                 {keywordAnalysisResult.analyzedKeywords.map((item, index) => (
-                                    <li key={`analyzed-${index}`} className="text-gray-700">
-                                    <strong className="text-gray-900">{item.keyword}</strong>:
-                                    Est. Volume: <span className="font-medium text-teal-600">{item.estimatedVolume}</span>
-                                    {item.notes && <span className="text-gray-500 italic"> ({item.notes})</span>}
-                                    </li>
+                                    <div key={`analyzed-${index}`} className="p-2 bg-gray-50 border border-gray-100 rounded-md">
+                                        <div className="text-gray-700">
+                                            <strong className="text-gray-900">{item.keyword}</strong>:
+                                            Est. Volume: <span className="font-medium text-teal-600">{item.estimatedVolume}</span>
+                                        </div>
+                                        {item.notes && (
+                                            <p className="text-xs text-gray-500 italic mt-1">{item.notes}</p>
+                                        )}
+                                    </div>
                                 ))}
-                                </ul>
+                                </div>
                             ) : <p className="text-gray-500">No specific analysis provided.</p>}
                         </div>
                         <div className="mt-3">
                             <h4 className="font-semibold text-gray-800 mb-2">Suggested Alternative Keywords:</h4>
+                            <p className="text-xs text-sky-600 mb-3"><strong>Tip:</strong> Click "Replace" to swap your primary keyword, or "Add" to include it in your focus keywords list.</p>
                             {keywordAnalysisResult.suggestedKeywords.length > 0 ? (
-                                <ul className="list-disc list-inside space-y-1 pl-1">
+                                <div className="space-y-3">
                                 {keywordAnalysisResult.suggestedKeywords.map((item, index) => (
-                                    <li key={`suggested-${index}`} className="text-gray-700">
-                                    <strong className="text-gray-900">{item.keyword}</strong>:
-                                    Est. Volume: <span className="font-medium text-teal-600">{item.estimatedVolume}</span>
-                                    {item.reason && <span className="text-gray-500 italic"> ({item.reason})</span>}
-                                    </li>
+                                    <div key={`suggested-${index}`} className="p-3 bg-white border border-gray-200 rounded-lg hover:border-teal-300 transition-colors">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-grow">
+                                                <div className="text-gray-700">
+                                                    <strong className="text-gray-900">{item.keyword}</strong>:
+                                                    Est. Volume: <span className="font-medium text-teal-600">{item.estimatedVolume}</span>
+                                                </div>
+                                                {item.reason && (
+                                                    <p className="text-xs text-gray-500 italic mt-1">{item.reason}</p>
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                                                <Button
+                                                    onClick={() => handleReplaceKeyword(item.keyword, false)}
+                                                    className="!py-1 !px-2 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+                                                    title="Replace primary focus keyword"
+                                                >
+                                                    Replace
+                                                </Button>
+                                                <Button
+                                                    onClick={() => handleReplaceKeyword(item.keyword, true)}
+                                                    className="!py-1 !px-2 text-xs bg-sky-600 hover:bg-sky-700 text-white"
+                                                    title="Add to focus keywords list"
+                                                >
+                                                    Add
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 ))}
-                                </ul>
+                                </div>
                             ) : <p className="text-gray-500">No alternative keywords suggested.</p>}
                         </div>
                         <p className="text-xs text-gray-400 mt-3 italic">
@@ -1610,6 +1707,22 @@ export const App: React.FC = () => {
       return null;
     }
   });
+
+  // Run migration on app startup
+  React.useEffect(() => {
+    const runMigration = async () => {
+      try {
+        console.log('Running authentication migration...');
+        await migrateUsersToHashedPasswords();
+        await ensureAdminUser();
+        console.log('Migration completed');
+      } catch (error) {
+        console.error('Migration failed:', error);
+      }
+    };
+    
+    runMigration();
+  }, []);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);

@@ -15,13 +15,27 @@ export const SavedBlogsManager: React.FC<SavedBlogsManagerProps> = ({ currentUse
     const [savedBlogs, setSavedBlogs] = useState<SavedBlogPost[]>([]);
 
     useEffect(() => {
-        setSavedBlogs(getSavedBlogsForUser(currentUser.id));
+        const loadBlogs = async () => {
+            try {
+                const blogs = await getSavedBlogsForUser(currentUser.id);
+                setSavedBlogs(blogs);
+            } catch (e) {
+                console.error('Failed to load saved blogs:', e);
+                setSavedBlogs([]);
+            }
+        };
+        loadBlogs();
     }, [currentUser.id]);
 
-    const handleDelete = (blogId: string, blogTitle: string) => {
+    const handleDelete = async (blogId: string, blogTitle: string) => {
         if (window.confirm(`Are you sure you want to delete the saved blog "${blogTitle}"? This action cannot be undone.`)) {
             onDeleteBlog(blogId);
-            setSavedBlogs(getSavedBlogsForUser(currentUser.id));
+            try {
+                const blogs = await getSavedBlogsForUser(currentUser.id);
+                setSavedBlogs(blogs);
+            } catch (e) {
+                console.error('Failed to refresh saved blogs after delete:', e);
+            }
         }
     };
     
@@ -37,7 +51,7 @@ export const SavedBlogsManager: React.FC<SavedBlogsManagerProps> = ({ currentUse
                         <p className="font-semibold text-sky-800">{blog.blogTitle}</p>
                         <p className="text-sm text-gray-500">Saved on: {new Date(blog.savedAt).toLocaleString()}</p>
                     </div>
-                    <div className="space-x-2 flex-shrink-0 self-end sm:self-center">
+                    <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
                         <Button onClick={() => onLoadBlog(blog)} className="bg-sky-600 hover:bg-sky-700 text-white !py-1.5 !px-3">
                             Load
                         </Button>

@@ -1,6 +1,5 @@
 
 
-
 export interface SeoSettings {
   title: string; // This is for H1
   metaTitle: string; // This is for the HTML <title> tag
@@ -37,6 +36,7 @@ export interface AiWriterProfile {
   knowledgeDocumentsText: string; // For pasted text or URLs
   brandVoice: string;
   selectedModel?: string; // Added for model selection per profile
+  selectedImageModel?: string; // Added for image model selection per profile
   imagePromptInstructions?: string; // For image generation guidelines
   sitemapPages?: { url: string; selected: boolean; }[];
   websiteContext?: string;
@@ -48,6 +48,7 @@ export interface WriterProfileData {
   knowledgeDocumentsText?: string;
   brandVoice?: string;
   selectedModel?: string; // Added for model selection
+  selectedImageModel?: string; // Added for image model selection
   imagePromptInstructions?: string; // For image generation guidelines
   websiteContext?: string;
 }
@@ -147,4 +148,23 @@ export interface GroundingSource {
 export interface GoogleNewsSearchResult {
   articles: Article[];
   groundingSources: GroundingSource[];
+}
+
+// Content Structure Enhancement Types
+export interface ContentStructureAnalysis {
+  issues: string[];
+  suggestions: string[];
+  improvedStructure?: string;
+}
+
+export interface IntroductionOptimization {
+  optimizedIntro: string;
+  keywordsIncluded: number;
+  hookType: 'statistic' | 'question' | 'bold_statement' | 'story';
+}
+
+export interface ConclusionWithCTA {
+  conclusion: string;
+  ctaType: 'engagement' | 'educational' | 'social' | 'action';
+  keywordReinforcement: boolean;
 }

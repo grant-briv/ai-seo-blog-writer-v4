@@ -1,3 +1,4 @@
+
 import type { SocialMediaPlatform } from './types';
 
 // Example constant (not strictly needed for this app yet, but good practice to have the file)
@@ -31,21 +32,8 @@ export const IMAGE_PROMPT_INSTRUCTIONS_MAX_TOKENS_ESTIMATE = Math.ceil(IMAGE_PRO
 
 // Available Models for Writer Profiles
 export const AVAILABLE_TEXT_MODELS = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Fast & Efficient)' },
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Enhanced Capabilities)' },
-  { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Optimized Speed)' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (High Performance)' },
-  { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro (Stable & Reliable)' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
 ];
-
-// Available Image Models for Writer Profiles
-export const AVAILABLE_IMAGE_MODELS = [
-  { id: 'imagen-3.0-generate-002', name: 'Imagen 3.0 Generate (Latest)' },
-  { id: 'imagen-3.0-fast-generate-001', name: 'Imagen 3.0 Fast Generate (Speed Optimized)' },
-  { id: 'imagen-2.0-generate-001', name: 'Imagen 2.0 Generate (Stable)' },
-];
-
-export const DEFAULT_IMAGE_MODEL = 'imagen-3.0-generate-002';
 
 // Social Media Platforms for Social Post Generator
 export const SOCIAL_MEDIA_PLATFORMS: SocialMediaPlatform[] = [

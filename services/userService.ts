@@ -1,44 +1,9 @@
 import type { User } from '../types';
 import { DatabaseService } from './databaseService';
+import { initializeSecureUsers } from './authService';
 
-// Initialize with a default admin user if none exist.
-// This function ensures there's always an admin available.
-const initializeUsers = async (): Promise<User[]> => {
-    const db = DatabaseService.getInstance();
-    const defaultAdmin: User = {
-        id: 'admin-001',
-        username: 'admin',
-        password: 'password', // INSECURE: For demo purposes only.
-        role: 'admin',
-        assignedProfileIds: [],
-    };
-    
-    try {
-        const users = await db.getAllUsers();
-        if (users.length > 0) {
-            // Ensure at least one admin exists. If not, add the default one.
-            if (users.some(u => u.role === 'admin')) {
-                return users;
-            } else {
-                await db.createUser(defaultAdmin);
-                return [...users, defaultAdmin];
-            }
-        }
-        // No users exist, create the default admin.
-        await db.createUser(defaultAdmin);
-        return [defaultAdmin];
-    } catch (e) {
-        console.error("Failed to initialize users:", e);
-        // Fallback to default admin if database is unavailable.
-        try {
-            await db.createUser(defaultAdmin);
-            return [defaultAdmin];
-        } catch (createError) {
-            console.error("Failed to create default admin:", createError);
-            return [defaultAdmin];
-        }
-    }
-};
+// Use secure initialization
+const initializeUsers = initializeSecureUsers;
 
 /**
  * Retrieves all users, ensuring the list is initialized.
@@ -85,20 +50,5 @@ export const saveUsers = async (users: User[]): Promise<void> => {
     }
 };
 
-/**
- * Authenticates a user against the stored user list.
- * @returns The user object if successful, otherwise null.
- */
-export const authenticateUser = async (username: string, password: string): Promise<User | null> => {
-    try {
-        const db = DatabaseService.getInstance();
-        const user = await db.getUserByUsername(username.toLowerCase());
-        if (user && user.password === password) {
-            return user;
-        }
-        return null;
-    } catch (e) {
-        console.error("Failed to authenticate user:", e);
-        return null;
-    }
-};
+// Re-export secure authentication from authService
+export { authenticateUser } from './authService';
