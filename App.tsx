@@ -178,34 +178,13 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
             Sign In
           </Button>
         </form>
-        <div className="text-center space-y-2">
+        <div className="text-center">
           <button
             type="button"
             onClick={() => setShowForgotPassword(true)}
-            className="text-sm text-sky-600 hover:text-sky-800 underline block w-full"
+            className="text-sm text-sky-600 hover:text-sky-800 underline"
           >
             Forgot your password?
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              if (confirm('Reset admin password to default? This will reset admin password to SecureAdmin123!')) {
-                try {
-                  const { resetAdminPassword } = await import('./services/authService');
-                  const result = await resetAdminPassword();
-                  if (result.success) {
-                    alert('Admin password reset to SecureAdmin123! You can now login.');
-                  } else {
-                    alert('Failed to reset password: ' + result.error);
-                  }
-                } catch (error) {
-                  alert('Error resetting password');
-                }
-              }
-            }}
-            className="text-xs text-red-600 hover:text-red-800 underline"
-          >
-            [Dev] Reset Admin Password
           </button>
         </div>
       </div>
