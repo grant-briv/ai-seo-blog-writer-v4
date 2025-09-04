@@ -357,6 +357,91 @@ export const logoutUser = (): void => {
 };
 
 /**
+ * Admin-only password reset for any user
+ */
+export const adminResetUserPassword = async (
+  adminUserId: string,
+  targetUsername: string,
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Verify admin user exists and is admin
+    const db = DatabaseService.getInstance();
+    const adminUser = await db.getUserById(adminUserId);
+    if (!adminUser || adminUser.role !== 'admin') {
+      return { success: false, error: 'Unauthorized - admin access required' };
+    }
+
+    // Get target user
+    const targetUser = await db.getUserByUsername(targetUsername.toLowerCase());
+    if (!targetUser) {
+      return { success: false, error: 'User not found' };
+    }
+
+    // Validate new password strength
+    const passwordValidation = validatePasswordStrength(newPassword);
+    if (!passwordValidation.isValid) {
+      return { success: false, error: passwordValidation.errors.join('; ') };
+    }
+
+    // Hash new password and update
+    const hashedPassword = await hashPassword(newPassword);
+    const updatedUser = { ...targetUser, password: hashedPassword };
+    await db.updateUser(updatedUser);
+
+    // Clear any lockouts for this user
+    clearFailedAttempts(targetUsername);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Admin password reset error:', error);
+    return { success: false, error: 'Failed to reset password' };
+  }
+};
+
+/**
+ * Emergency admin password reset (when no admin access available)
+ */
+export const emergencyAdminReset = async (
+  newPassword: string,
+  confirmationCode: string = 'EMERGENCY_RESET_2024'
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    // Simple confirmation code check (in production, this would be more secure)
+    if (confirmationCode !== 'EMERGENCY_RESET_2024') {
+      return { success: false, error: 'Invalid confirmation code' };
+    }
+
+    // Validate new password strength
+    const passwordValidation = validatePasswordStrength(newPassword);
+    if (!passwordValidation.isValid) {
+      return { success: false, error: passwordValidation.errors.join('; ') };
+    }
+
+    // Get admin user
+    const db = DatabaseService.getInstance();
+    const adminUser = await db.getUserByUsername('admin');
+    if (!adminUser) {
+      return { success: false, error: 'Admin user not found' };
+    }
+
+    // Hash new password and update
+    const hashedPassword = await hashPassword(newPassword);
+    const updatedUser = { ...adminUser, password: hashedPassword };
+    await db.updateUser(updatedUser);
+
+    // Clear any lockouts for admin
+    clearFailedAttempts('admin');
+
+    console.log('Emergency admin password reset completed');
+    return { success: true };
+  } catch (error) {
+    console.error('Emergency password reset error:', error);
+    return { success: false, error: 'Failed to perform emergency reset' };
+  }
+};
+
+/**
  * Get current session from storage
  */
 export const getCurrentSession = (): { isValid: boolean; user?: User; error?: string } => {

@@ -7,6 +7,7 @@ import { ArrowLeftIcon, PlusCircleIcon, TrashIcon, UserGroupIcon, SaveIcon } fro
 import { getUsers, saveUsers } from '../services/userService';
 import { TextInput } from './TextInput';
 import { ApiKeyManager } from './ApiKeyManager';
+import { PasswordManager } from './PasswordManager';
 
 interface AdminPageProps {
   profiles: AiWriterProfile[];
@@ -212,7 +213,21 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
 
 // --- Main Admin Page Component ---
 export const AdminPage: React.FC<AdminPageProps> = ({ profiles, setCurrentView, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'apikeys'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'apikeys' | 'passwords'>('users');
+  const [users, setUsers] = useState<User[]>([]);
+  const [refreshUsers, setRefreshUsers] = useState(0);
+
+  React.useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        const loadedUsers = await getUsers();
+        setUsers(loadedUsers);
+      } catch (e) {
+        console.error('Failed to load users:', e);
+      }
+    };
+    loadUsers();
+  }, [refreshUsers]);
 
   const TabButton: React.FC<{ tabId: typeof activeTab; icon: React.ReactNode; label: string; onClick: () => void }> = ({ tabId, icon, label, onClick }) => (
     <button
@@ -249,6 +264,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ profiles, setCurrentView, 
                 label="User Management" 
               />
               <TabButton 
+                tabId="passwords" 
+                onClick={() => setActiveTab('passwords')} 
+                icon={<SaveIcon className="w-5 h-5" />} 
+                label="Password Management" 
+              />
+              <TabButton 
                 tabId="apikeys" 
                 onClick={() => setActiveTab('apikeys')} 
                 icon={<SaveIcon className="w-5 h-5" />} 
@@ -260,6 +281,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ profiles, setCurrentView, 
               <SectionCard title="User Management" icon={<UserGroupIcon className="w-6 h-6 text-sky-600"/>}>
                 <UserManagement allProfiles={profiles} />
               </SectionCard>
+            )}
+
+            {activeTab === 'passwords' && (
+              <PasswordManager 
+                currentUser={currentUser} 
+                allUsers={users}
+                onUsersChange={() => setRefreshUsers(prev => prev + 1)}
+              />
             )}
 
             {activeTab === 'apikeys' && (
