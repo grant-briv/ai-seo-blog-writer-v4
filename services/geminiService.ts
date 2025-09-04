@@ -747,6 +747,7 @@ export async function generateTrendingQuestions(
   topic: string,
   profileData?: WriterProfileData
 ): Promise<string[]> {
+  const aiClient = await initializeAI();
   const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
 
   const baseSystemInstruction = `You are a content strategy expert specializing in SEO and viral content. Your task is to generate a list of 15 trending questions and headline ideas that consumers are asking related to a given topic.
@@ -871,6 +872,7 @@ export async function suggestInternalLinks(
   mainContent: string,
   profileData?: WriterProfileData
 ): Promise<string[]> {
+  const aiClient = await initializeAI();
   const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
 
   const baseSystemInstruction = `You are an expert SEO strategist specializing in internal linking. Your task is to analyze blog post content and suggest relevant internal links from a provided list of available website pages. This list of pages is provided under the heading "INTERNAL LINKING CONTEXT".
@@ -908,6 +910,7 @@ export async function suggestExternalLinks(
   keywords: string[],
   profileData?: WriterProfileData
 ): Promise<ExternalLinkSuggestion[]> {
+  const aiClient = await initializeAI();
   const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
 
   const baseSystemInstruction = `You are a meticulous SEO expert and research analyst with a focus on sourcing high-quality, authoritative, and **currently live** external links. Your reputation depends on the quality and validity of the links you suggest. Every link you provide must lead to a valid, working webpage.
