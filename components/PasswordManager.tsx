@@ -55,11 +55,17 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({
     try {
       const result = await updateUserPassword(currentUser.id, currentPassword, newPassword);
       if (result.success) {
-        setChangeSuccess('Password changed successfully!');
+        setChangeSuccess('Password changed successfully! You will be logged out in 3 seconds for security.');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
-        setTimeout(() => setChangeSuccess(''), 5000);
+        
+        // Log out the user after password change for security
+        setTimeout(() => {
+          sessionStorage.removeItem('authToken');
+          sessionStorage.removeItem('currentUser');
+          window.location.reload();
+        }, 3000);
       } else {
         setChangeError(result.error || 'Failed to change password');
       }
