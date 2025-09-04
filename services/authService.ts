@@ -496,6 +496,34 @@ export const resetPasswordWithToken = async (
 };
 
 /**
+ * Emergency admin password reset (for Railway deployment issues)
+ */
+export const resetAdminPassword = async (): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const db = DatabaseService.getInstance();
+    const adminUser = await db.getUserByUsername('admin');
+    
+    if (!adminUser) {
+      return { success: false, error: 'Admin user not found' };
+    }
+
+    // Reset to default secure password
+    const hashedPassword = await hashPassword('SecureAdmin123!');
+    const updatedUser = { ...adminUser, password: hashedPassword };
+    await db.updateUser(updatedUser);
+
+    // Clear any lockouts
+    clearFailedAttempts('admin');
+
+    console.log('Emergency admin password reset to SecureAdmin123!');
+    return { success: true };
+  } catch (error) {
+    console.error('Emergency admin reset error:', error);
+    return { success: false, error: 'Failed to reset admin password' };
+  }
+};
+
+/**
  * Get current session from storage
  */
 export const getCurrentSession = (): { isValid: boolean; user?: User; error?: string } => {
