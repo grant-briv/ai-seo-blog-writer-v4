@@ -607,6 +607,7 @@ ${mainContent}
 
 
 export async function searchGoogleNews(query: string): Promise<GoogleNewsSearchResult> {
+  const aiClient = await initializeAI();
   try {
     const response = await aiClient.models.generateContent({
       model: DEFAULT_TEXT_MODEL,
@@ -677,6 +678,7 @@ ARTICLE_END
 
 
 export async function deepResearchOnTopic(title: string, link: string, snippet: string): Promise<string> {
+    const aiClient = await initializeAI();
     try {
         const response = await aiClient.models.generateContent({
             model: DEFAULT_TEXT_MODEL,
@@ -695,6 +697,7 @@ export async function deepResearchOnTopic(title: string, link: string, snippet: 
 }
 
 export async function analyzeArticleViralPotential(article: Article): Promise<ArticleStats> {
+  const aiClient = await initializeAI();
   const selectedModel = DEFAULT_TEXT_MODEL;
 
   const baseSystemInstruction = `You are a viral content analyst. Your task is to analyze an article's title, snippet, and link to predict its potential for going viral. You must respond with a single, clean JSON object. Do not add any commentary before or after the JSON.
@@ -781,6 +784,7 @@ export async function generateTrendingQuestions(
 }
 
 export async function researchHeadlineIdea(headline: string): Promise<string> {
+    const aiClient = await initializeAI();
     try {
         const response = await aiClient.models.generateContent({
             model: DEFAULT_TEXT_MODEL,
@@ -822,6 +826,7 @@ export async function researchHeadlineIdea(headline: string): Promise<string> {
 }
 
 export async function generateWebsiteContext(urls: string[]): Promise<string> {
+  const aiClient = await initializeAI();
   const model = aiClient.models.generateContent;
 
   const summaryPromises = urls.map(url =>
