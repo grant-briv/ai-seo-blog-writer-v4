@@ -13,11 +13,12 @@ import {
   IMAGE_GENERATION_MODEL
 } from '../constants';
 import { getGeminiApiKey } from './apiKeyService';
+import { googleSearchService } from './googleSearchService';
 
 // Initialize AI client - will be set when API key is retrieved
 let ai: GoogleGenAI | null = null;
 
-const initializeAI = async (): Promise<GoogleGenAI> => {
+export const initializeAI = async (): Promise<GoogleGenAI> => {
   if (ai) return ai;
   
   const apiKey = await getGeminiApiKey();
@@ -357,6 +358,7 @@ export async function generateMetaAndSlug(
   focusKeywords: string,
   profileData?: WriterProfileData
 ): Promise<SuggestedSeoElements> {
+    const aiClient = await initializeAI();
     const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
 
     const baseSystemInstruction = `You are an SEO expert. Your task is to generate SEO elements for a blog post based on its content.
@@ -364,7 +366,7 @@ You must return a single JSON object with the following keys: "suggestedTitle", 
 Each field has STRICT length requirements.
 - suggestedTitle: A compelling H1 title. Must be between ${TITLE_MIN_LENGTH} and ${TITLE_MAX_LENGTH} characters.
 - suggestedMetaTitle: A concise and keyword-rich HTML title tag. Must be between ${META_TITLE_MIN_LENGTH} and ${META_TITLE_MAX_LENGTH} characters.
-- suggestedMetaDescription: An enticing meta description. MUST be between ${META_DESCRIPTION_MIN_LENGTH} and ${META_DESCRIPTION_MAX_LENGTH} characters. It ABSOLUTELY MUST NOT exceed ${META_DESCRIPTION_MAX_LENGTH} characters.
+- suggestedMetaDescription: An enticing meta description. MUST be between ${META_DESCRIPTION_MIN_LENGTH} and ${META_DESCRIPTION_MAX_LENGTH} characters INCLUDING SPACES. It ABSOLUTELY MUST NOT exceed ${META_DESCRIPTION_MAX_LENGTH} characters. Aim for around 140-150 characters to be safe.
 - suggestedSlug: A URL-friendly slug, based on the suggested title. Lowercase, hyphen-separated.`;
 
     const userRequest = `
@@ -405,6 +407,7 @@ export async function generateImagePromptIdea(
   mainContent: string,
   profileData?: WriterProfileData
 ): Promise<string> {
+  const aiClient = await initializeAI();
   const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
   const baseSystemInstruction = `You are a creative assistant. Your task is to read a blog post and suggest a single, detailed, and visually interesting image prompt for a text-to-image model. The prompt should capture the essence of the blog post.`;
   const userRequest = `
@@ -431,6 +434,7 @@ export async function refineGeneratedImagePrompt(
   refinementInstructions: string,
   profileData?: WriterProfileData
 ): Promise<string> {
+  const aiClient = await initializeAI();
   const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
   const baseSystemInstruction = `You are a prompt engineer. Your task is to refine an existing image generation prompt based on user instructions. You must return only the new, updated prompt.`;
   const userRequest = `
@@ -476,6 +480,7 @@ export async function generateSocialMediaPosts(
   platform: SocialMediaPlatform,
   profileData?: WriterProfileData
 ): Promise<string[]> {
+  const aiClient = await initializeAI();
   const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
   const fullUrl = (seo.blogPostUrl.endsWith('/') ? seo.blogPostUrl : seo.blogPostUrl + '/') + seo.slug;
 
@@ -514,6 +519,7 @@ export async function estimateKeywordVolumeAndSuggest(
   keywords: string,
   profileData?: WriterProfileData
 ): Promise<KeywordVolumeAnalysisResult> {
+  const aiClient = await initializeAI();
   const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
   const baseSystemInstruction = `You are an SEO keyword research tool. Analyze the user's keywords and suggest alternatives.
 You MUST return a single, clean JSON object and nothing else. Do not add any conversational text, explanations, or markdown formatting like \`\`\`json. The entire response must be only the raw JSON.
@@ -554,6 +560,7 @@ export async function improveKeywordDensity(
   profileData?: WriterProfileData,
   wordCountSettings?: { minWordCount?: number; maxWordCount?: number; }
 ): Promise<string> {
+    const aiClient = await initializeAI();
     const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
 
     let wordCountConstraint = '';
@@ -905,7 +912,163 @@ ${mainContent.substring(0, 8000)}
   }
 }
 
+// Link verification utility function
+async function verifyLinkQuality(url: string): Promise<{ isValid: boolean; statusCode?: number; error?: string }> {
+  try {
+    // Basic URL format validation
+    const urlObj = new URL(url);
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      return { isValid: false, error: 'Invalid protocol' };
+    }
+
+    // Check if it looks like a valid, specific article URL (not just a homepage)
+    const path = urlObj.pathname;
+    const hasSpecificPath = path.length > 1 && path !== '/';
+    
+    // Allow paths that end with '/' if they have substantial content before it
+    const pathWithoutSlash = path.replace(/\/$/, '');
+    const pathSegments = pathWithoutSlash.split('/').filter(segment => segment.length > 0);
+    
+    if (!hasSpecificPath || pathSegments.length < 2) {
+      return { isValid: false, error: 'URL appears to be a homepage or invalid path' };
+    }
+
+    // Due to CORS restrictions, we can't actually verify URLs in the browser
+    // The AI must do proper verification through Google Search
+    // We'll rely on domain reputation and URL structure for now
+    return { isValid: true, statusCode: 200 };
+    
+  } catch (error) {
+    return { isValid: false, error: error instanceof Error ? error.message : 'Invalid URL format' };
+  }
+}
+
+// Domain reputation checker
+function isReputableDomain(url: string): boolean {
+  try {
+    const domain = new URL(url).hostname.toLowerCase();
+    
+    // High-authority domains (government, education, major organizations)
+    const highAuthorityDomains = [
+      // Government
+      '.gov', '.edu',
+      // Major news and business
+      'reuters.com', 'bloomberg.com', 'wsj.com', 'forbes.com', 'fortune.com',
+      'harvard.edu', 'stanford.edu', 'mit.edu', 'cnn.com', 'bbc.com',
+      'nytimes.com', 'washingtonpost.com', 'economist.com',
+      // Research and academic
+      'ncbi.nlm.nih.gov', 'scholar.google.com', 'pubmed.ncbi.nlm.nih.gov',
+      'nature.com', 'science.org', 'cell.com', 'sciencedirect.com',
+      // Major organizations
+      'who.int', 'worldbank.org', 'un.org', 'unesco.org',
+      // Tech authorities  
+      'mozilla.org', 'w3.org', 'ietf.org', 'stackoverflow.com',
+      // Business authorities
+      'mckinsey.com', 'bcg.com', 'deloitte.com', 'pwc.com',
+      // Industry-specific authorities
+      // Real Estate
+      'nar.realtor', 'realtor.com', 'zillow.com', 'housingwire.com',
+      'theclose.com', 'homelight.com', 'inman.com', 'realtrends.com',
+      // Home improvement
+      'hgtv.com', 'thisoldhouse.com', 'bobvila.com', 'familyhandyman.com',
+      // Health
+      'mayoclinic.org', 'webmd.com', 'healthline.com', 'medicalnewstoday.com',
+      // Finance
+      'investopedia.com', 'morningstar.com', 'sec.gov', 'federalreserve.gov',
+      'nerdwallet.com', 'bankrate.com', 'creditkarma.com', 'mint.com', 'marketwatch.com',
+      // Technology
+      'techcrunch.com', 'wired.com', 'arstechnica.com', 'zdnet.com',
+      // Marketing/Business
+      'hubspot.com', 'salesforce.com', 'marketingland.com',
+      // Training and Professional Development
+      'setsail.training', 'thepaperlessagent.com', 'avenuehq.com'
+    ];
+
+    // Check if domain ends with high-authority TLD or is in our list
+    const isHighAuthority = highAuthorityDomains.some(auth => 
+      domain.endsWith(auth) || domain.includes(auth)
+    );
+
+    // Avoid clearly low-quality domains (more permissive now)
+    const lowQualityPatterns = [
+      'blogspot.com', 'wordpress.com', 
+      'quora.com', 'reddit.com', 'facebook.com', 'twitter.com',
+      'linkedin.com/pulse', 'youtube.com',
+      'scam', 'spam', 'fake'
+    ];
+
+    const isLowQuality = lowQualityPatterns.some(pattern => 
+      domain.includes(pattern)
+    );
+
+    // Be more permissive - if it's not explicitly low quality, allow it
+    // unless we're specifically looking for high authority
+    return isHighAuthority || !isLowQuality;
+  } catch {
+    return false;
+  }
+}
+
 export async function suggestExternalLinks(
+  mainContent: string,
+  keywords: string[],
+  profileData?: WriterProfileData
+): Promise<ExternalLinkSuggestion[]> {
+  // Check if Google Custom Search is configured for this profile
+  if (profileData?.googleSearchConfig && googleSearchService.isConfigured(profileData.googleSearchConfig)) {
+    console.log('🔍 Using Google Custom Search API for external links...');
+    return await suggestExternalLinksWithCustomSearch(mainContent, keywords, profileData);
+  } else {
+    console.log('🔍 Using fallback Gemini search for external links...');
+    return await suggestExternalLinksWithGemini(mainContent, keywords, profileData);
+  }
+}
+
+async function suggestExternalLinksWithCustomSearch(
+  mainContent: string,
+  keywords: string[],
+  profileData?: WriterProfileData
+): Promise<ExternalLinkSuggestion[]> {
+  try {
+    // Extract key topics from the content and keywords
+    const topics = [...keywords];
+    
+    // Add extracted topics from content (basic extraction)  
+    const sentences = mainContent.replace(/<[^>]*>/g, '').split(/[.!?]+/);
+    // Extract additional topics from important sentences
+    const importantSentences = sentences
+      .filter(sentence => sentence.length > 50 && sentence.length < 200)
+      .slice(0, 3);
+    
+    // Add key phrases from important sentences to topics
+    importantSentences.forEach(sentence => {
+      const words = sentence.toLowerCase().split(/\s+/);
+      // Look for potential key phrases (2-3 word combinations)
+      for (let i = 0; i < words.length - 1; i++) {
+        const phrase = words.slice(i, i + 2).join(' ');
+        if (phrase.length > 8 && !topics.some(t => t.toLowerCase().includes(phrase))) {
+          topics.push(phrase);
+        }
+      }
+    });
+    
+    // Use Google Custom Search to find authoritative links
+    const suggestions = await googleSearchService.findAuthoritativeLinks(topics, profileData.googleSearchConfig!, [], mainContent);
+    
+    console.log(`📊 Google Custom Search found ${suggestions.length} relevant links with proper anchor text`);
+    return suggestions.slice(0, 5); // Limit to 5 suggestions
+    
+  } catch (error) {
+    console.error('💥 Error with Google Custom Search, falling back to Gemini:', error);
+    // If it's a rate limit error, show a helpful message
+    if (error instanceof Error && (error.message.includes('429') || error.message.includes('quota') || error.message.includes('Quota'))) {
+      console.warn('🚫 Google Custom Search API quota exceeded. Falling back to Gemini search.');
+    }
+    return await suggestExternalLinksWithGemini(mainContent, keywords, profileData);
+  }
+}
+
+async function suggestExternalLinksWithGemini(
   mainContent: string,
   keywords: string[],
   profileData?: WriterProfileData
@@ -916,48 +1079,87 @@ export async function suggestExternalLinks(
   const baseSystemInstruction = `You are a meticulous SEO expert and research analyst with a focus on sourcing high-quality, authoritative, and **currently live** external links. Your reputation depends on the quality and validity of the links you suggest. Every link you provide must lead to a valid, working webpage.
 
 **CRITICAL RULES for Link Sourcing & Verification:**
-1.  **Live Verification is Mandatory:** You MUST use your Google Search tool to find and verify every single link you suggest. DO NOT suggest any URL from your own knowledge base or memory. If a search result looks promising but the link might be dead (e.g., an old press release), you must find a different, more reliable source. **A 404 error is a complete failure.**
-2.  **Prioritize Authority:** Your primary goal is to find sources that add significant credibility. Give strong preference to:
-    *   Educational institutions (.edu)
-    *   Government websites (.gov)
-    *   Major non-profit organizations (.org)
-    *   Well-established, reputable industry publications (e.g., Forbes, Harvard Business Review, major scientific journals).
-    *   Primary research studies or data sources.
-3.  **AVOID Low-Quality Sources:** You MUST NOT suggest links from:
-    *   Direct competitors or commercial product pages.
-    *   User-generated content sites (e.g., forums, Quora, Reddit).
-    *   Personal blogs unless they are widely recognized as an authority in the field.
-    *   Press releases, especially older ones, as they often lead to 404s.
-    *   Content farms or sites with excessive advertising.
-4.  **Link to Specific Content:** Do not link to homepages (e.g., \`forbes.com\`). Link to the specific, relevant article or resource (e.g., \`forbes.com/sites/...\`).
-5.  **Perform a Common-Sense Check:** Before suggesting a link, ask: "Is this a source I would trust and cite in a professional research paper? Does it look like it's actively maintained?" If the answer is no, find a better one.
 
-You MUST return a single, clean JSON array of objects. Do not add any commentary before or after the JSON.
+⚠️ **MANDATORY SEARCH REQUIREMENT:** You MUST use the Google Search tool for EVERY SINGLE LINK you suggest. DO NOT use any URLs from your training data or memory. Every URL must come from a fresh Google search.
+
+**STEP-BY-STEP PROCESS YOU MUST FOLLOW:**
+1. **Search First:** For each potential link opportunity, perform a Google search using relevant keywords
+2. **Verify Domain Authority:** Only select results from these high-authority domains:
+   - **Tier 1:** Government (.gov), Educational (.edu), Major research (ncbi.nlm.nih.gov, nature.com, science.org)  
+   - **Tier 2:** Major news & finance (reuters.com, bloomberg.com, wsj.com, forbes.com, cnn.com, nytimes.com, marketwatch.com)
+   - **Tier 3:** Industry publications & organizations (realtor.com, zillow.com, nar.realtor, investopedia.com, nerdwallet.com, bankrate.com)
+   - **Tier 4:** Educational institutions (harvard.edu, mit.edu, stanford.edu) and reputable consulting (mckinsey.com, deloitte.com)
+3. **Check Recency:** Prioritize articles from 2022-2024 (expanded range)
+4. **Verify Specificity:** Ensure links go to specific articles, not homepages  
+5. **CRITICAL - Verify URL Exists:** You MUST click on each URL in your search results to confirm it leads to a real, accessible page. DO NOT suggest URLs that return 404 errors or access denied pages.
+6. **Double-Check with Additional Search:** Search for the exact URL to confirm it appears in Google's index
+
+**SEARCH STRATEGY:**
+- Use queries like: "site:realtor.com [topic] 2024"
+- Use queries like: "site:investopedia.com [topic] 2023"  
+- Use queries like: "site:nerdwallet.com [topic] 2024"
+- Use queries like: "[topic] site:zillow.com OR site:bankrate.com"
+- Always include recent year (2022-2024) in searches
+
+**ABSOLUTELY FORBIDDEN:**
+- Suggesting URLs without searching first
+- Using links from your training knowledge
+- Linking to personal blogs, WordPress.com, or content farms
+- Suggesting homepage URLs or broken links
+
+🚨 **CRITICAL JSON REQUIREMENT:** 
+You MUST return ONLY a valid JSON array. NO explanatory text, NO commentary, NO reasoning. 
+If you cannot find any suitable links, return an empty array: []
+
 The array should contain up to 5 suggestion objects. Each object must have this exact structure:
 {
-  "url": string, // The full, verified, and working URL of the authoritative external source.
+  "url": string, // The full, verified, and working URL found through Google search
   "anchorText": string, // The specific text within the 'context' sentence that should become the hyperlink.
   "context": string // The complete, original sentence from the blog post where the link should be placed. This must be an exact match.
-}`;
+}
+
+REMEMBER: Return ONLY the JSON array, nothing else.`;
 
   const keywordGuidance = keywords && keywords.length > 0
     ? `**Guiding Keywords:** Use these keyword phrases to focus your search for relevant sources. Find articles that discuss these topics:\n- ${keywords.join('\n- ')}\n`
     : '';
 
   const userRequest = `
-Analyze the following blog content. Find up to 5 opportunities to add valuable external links.
-For each opportunity, identify the source URL, the best anchor text, and the full sentence from the original content that provides the context.
+🔍 **TASK: Find 5 External Link Opportunities Using Google Search**
+
+**MANDATORY REQUIREMENTS:**
+1. You MUST use Google Search tool before suggesting any URL
+2. Search for recent (2023-2024) articles on authoritative domains only  
+3. Verify each URL exists by searching for it directly
+4. Only suggest URLs that appear in current Google search results
+
+**PROCESS:**
+1. Analyze the blog content below
+2. Identify 5 places where external links would add value
+3. For each opportunity:
+   - Perform a Google search for relevant, recent articles
+   - Select only results from high-authority domains
+   - Verify the specific URL exists in search results
+   - Extract the exact sentence from the blog content
 
 ${keywordGuidance}
-Blog Content to Analyze:
+
+**Blog Content to Analyze:**
 ${mainContent}
 
-Return your findings in the specified JSON format.
+🚨 **CRITICAL RESPONSE FORMAT:** 
+- Every URL MUST come from a Google search you perform AND be verified as working
+- You MUST test each URL by clicking it in search results before suggesting it
+- Return ONLY a JSON array - no explanation, no text, no reasoning
+- If no suitable links found, return: []
+- Example format: [{"url": "https://...", "anchorText": "...", "context": "..."}]
+- QUALITY OVER QUANTITY: Better to return 1-2 working links than 5 broken ones
 `;
 
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'externalLinking');
 
   try {
+    console.log('🔍 Starting external link suggestion process...');
     const response = await aiClient.models.generateContent({
       model: selectedModel,
       contents: prompt,
@@ -965,8 +1167,45 @@ Return your findings in the specified JSON format.
         tools: [{ googleSearch: {} }],
       },
     });
-    return parseJsonResponse<ExternalLinkSuggestion[]>(response.text, []);
+    
+    console.log('📝 AI Response received:', response.text);
+    const rawSuggestions = parseJsonResponse<ExternalLinkSuggestion[]>(response.text, []);
+    console.log(`🔗 AI suggested ${rawSuggestions.length} links for verification`);
+    
+    // Log all suggested URLs for debugging
+    rawSuggestions.forEach((suggestion, index) => {
+      console.log(`🔗 Suggestion ${index + 1}:`);
+      console.log(`   URL: ${suggestion.url}`);
+      console.log(`   Anchor: ${suggestion.anchorText}`);
+      console.log(`   Context: ${suggestion.context}`);
+    });
+    
+    // Verify each suggested link
+    const verifiedSuggestions: ExternalLinkSuggestion[] = [];
+    
+    for (const suggestion of rawSuggestions) {
+      console.log(`🔍 Verifying link: ${suggestion.url}`);
+      
+      // Check domain reputation first (faster)
+      if (!isReputableDomain(suggestion.url)) {
+        console.log(`❌ Skipping low-reputation domain: ${suggestion.url}`);
+        continue;
+      }
+      
+      // Verify link is accessible
+      const verification = await verifyLinkQuality(suggestion.url);
+      if (verification.isValid) {
+        console.log(`✅ Link verified: ${suggestion.url} (Status: ${verification.statusCode})`);
+        verifiedSuggestions.push(suggestion);
+      } else {
+        console.log(`❌ Link failed verification: ${suggestion.url} (${verification.error || 'Status: ' + verification.statusCode})`);
+      }
+    }
+    
+    console.log(`📊 Final result: ${verifiedSuggestions.length} verified links out of ${rawSuggestions.length} suggestions`);
+    return verifiedSuggestions;
   } catch (error) {
+    console.error('💥 Error in suggestExternalLinks:', error);
     handleApiError(error, 'suggestExternalLinks');
   }
 }

@@ -9,6 +9,7 @@ import { TextAreaInput } from './components/TextAreaInput';
 import { Button } from './components/Button';
 import { SectionCard } from './components/SectionCard';
 import { BlogPreview } from './components/BlogPreview';
+import { ContentEnhancementUI } from './components/ContentEnhancementUI';
 import {
   generateBlogPost,
   generateImprovedHeadline,
@@ -346,6 +347,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
       selectedModel: activeWriterProfile.selectedModel || DEFAULT_TEXT_MODEL,
       imagePromptInstructions: activeWriterProfile.imagePromptInstructions,
       websiteContext: activeWriterProfile.websiteContext,
+      googleSearchConfig: activeWriterProfile.googleSearchConfig,
     };
   }, [activeWriterProfile]);
 
@@ -997,7 +999,14 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
       if (err instanceof RateLimitError) {
         setExternalLinkError(err.message);
       } else {
-        setExternalLinkError(err instanceof Error ? err.message : 'Failed to suggest external links.');
+        const errorMessage = err instanceof Error ? err.message : 'Failed to suggest external links.';
+        
+        // Handle Google API rate limit errors specifically
+        if (errorMessage.includes('quota') || errorMessage.includes('Quota') || errorMessage.includes('429')) {
+          setExternalLinkError('Google Search API quota exceeded. You can: (1) Wait a few minutes and try again, (2) Use fewer keywords, or (3) The system will automatically fall back to basic search results.');
+        } else {
+          setExternalLinkError(errorMessage);
+        }
       }
       console.error(err);
     } finally {
@@ -1006,10 +1015,24 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
   }, [mainContent, getActiveProfileData, seoSettings.externalLinkKeywords]);
 
   const handleAddExternalLink = useCallback((suggestion: ExternalLinkSuggestion) => {
-    console.log('Adding external link:', { suggestion, mainContentLength: mainContent.length });
+    console.log('🔗 Adding external link:', { 
+      url: suggestion.url, 
+      anchorText: suggestion.anchorText,
+      context: suggestion.context?.substring(0, 100) + '...',
+      mainContentLength: mainContent.length 
+    });
+    
+    // Debug: Let's check what's in the content
+    const plainContent = mainContent.replace(/<[^>]*>/g, ''); // Remove HTML tags for comparison
+    console.log('🔍 Searching for anchor text in content...');
+    console.log('Anchor text:', `"${suggestion.anchorText}"`);
+    console.log('Context:', `"${suggestion.context?.substring(0, 150)}..."`);
+    console.log('Content has anchor text?', plainContent.includes(suggestion.anchorText));
+    console.log('Content has context?', suggestion.context ? plainContent.includes(suggestion.context) : 'No context provided');
     
     // First, check if the anchor text exists anywhere in the content (more flexible approach)
     if (mainContent.includes(suggestion.anchorText)) {
+        console.log('✅ Found anchor text in content, replacing...');
         const linkHtml = `<a href="${suggestion.url}" target="_blank" rel="noopener noreferrer">${suggestion.anchorText}</a>`;
         
         // Replace the first occurrence of the anchor text with the link
@@ -1017,31 +1040,45 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
         
         if (newContent !== mainContent) {
             setMainContent(newContent);
-            console.log('Successfully added external link');
+            console.log('✅ Successfully added external link');
             
             // Remove the suggestion from the list once it's used
             setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
         } else {
+            console.log('❌ Replace failed - content unchanged');
             alert(`Could not replace anchor text "${suggestion.anchorText}". Please add the link manually.`);
         }
-    } else {
+    } else if (suggestion.context && mainContent.includes(suggestion.context)) {
+        console.log('✅ Found context in content, replacing within context...');
         // Fallback: try to find the context sentence
-        if (mainContent.includes(suggestion.context)) {
-            const linkHtml = `<a href="${suggestion.url}" target="_blank" rel="noopener noreferrer">${suggestion.anchorText}</a>`;
-            const newContext = suggestion.context.replace(suggestion.anchorText, linkHtml);
+        const linkHtml = `<a href="${suggestion.url}" target="_blank" rel="noopener noreferrer">${suggestion.anchorText}</a>`;
+        const newContext = suggestion.context.replace(suggestion.anchorText, linkHtml);
 
-            if (newContext !== suggestion.context) {
-                const newContent = mainContent.replace(suggestion.context, newContext);
-                setMainContent(newContent);
-                console.log('Successfully added external link via context');
-                
-                setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
-            } else {
-                alert(`Could not replace anchor text "${suggestion.anchorText}" within context. Please add the link manually.`);
-            }
+        if (newContext !== suggestion.context) {
+            const newContent = mainContent.replace(suggestion.context, newContext);
+            setMainContent(newContent);
+            console.log('✅ Successfully added external link via context');
+            
+            setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
         } else {
-            alert(`Could not find anchor text "${suggestion.anchorText}" or context sentence in content. The content may have been edited. Please add the link manually.`);
+            console.log('❌ Context replace failed - context unchanged');
+            alert(`Could not replace anchor text "${suggestion.anchorText}" within context. Please add the link manually.`);
         }
+    } else {
+        console.log('❌ Neither anchor text nor context found in content');
+        console.log('Trying fuzzy matching...');
+        
+        // Try fuzzy matching - look for similar phrases
+        const words = suggestion.anchorText.split(' ');
+        const plainContent = mainContent.replace(/<[^>]*>/g, '');
+        
+        for (const word of words) {
+            if (word.length > 3 && plainContent.toLowerCase().includes(word.toLowerCase())) {
+                console.log(`🔍 Found word "${word}" in content`);
+            }
+        }
+        
+        alert(`Could not find anchor text "${suggestion.anchorText}" or context sentence in content. The content may have been edited. Please add the link manually.`);
     }
   }, [mainContent]);
 
@@ -1497,6 +1534,14 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                   </div>
               )}
           </SectionCard>
+
+          {mainContent && (
+            <ContentEnhancementUI
+              content={mainContent}
+              profileData={getActiveProfileData()}
+              onContentImproved={(improvedContent) => setMainContent(improvedContent)}
+            />
+          )}
 
           <SectionCard title="Live WordPress-Style Preview" icon={<WordpressIcon className="w-6 h-6 text-sky-600"/>} >
             <div className="bg-white p-6 rounded-md shadow-lg min-h-[600px] text-gray-800 overflow-y-auto max-h-[calc(100vh-150px)] border border-gray-200">

@@ -40,6 +40,15 @@ export interface AiWriterProfile {
   imagePromptInstructions?: string; // For image generation guidelines
   sitemapPages?: { url: string; selected: boolean; }[];
   websiteContext?: string;
+  googleSearchConfig?: GoogleSearchConfig; // Profile-specific search configuration
+  isPublic?: boolean; // Whether the profile is public (shareable) or private
+}
+
+// Google Search configuration for profiles
+export interface GoogleSearchConfig {
+  apiKey: string;
+  searchEngineId: string;
+  isEnabled: boolean;
 }
 
 // Data structure for passing profile specifics to Gemini service
@@ -51,6 +60,7 @@ export interface WriterProfileData {
   selectedImageModel?: string; // Added for image model selection
   imagePromptInstructions?: string; // For image generation guidelines
   websiteContext?: string;
+  googleSearchConfig?: GoogleSearchConfig; // Profile-specific search configuration
 }
 
 // For Social Post Generator
@@ -89,6 +99,9 @@ export interface User {
   password: string; // For demo purposes only. DO NOT use in production.
   role: 'admin' | 'general';
   assignedProfileIds: string[];
+  email?: string; // Email address for invitations and password reset
+  resetToken?: string; // Temporary password reset token
+  isTemporaryPassword?: boolean; // Flag to indicate if password needs to be changed
 }
 
 // For the External Link Suggester
@@ -96,6 +109,9 @@ export interface ExternalLinkSuggestion {
   url: string;
   anchorText: string;
   context: string; // The exact sentence in the blog post for replacement
+  title?: string; // Optional title from search result
+  domain?: string; // Optional domain for display
+  snippet?: string; // Optional snippet for context
 }
 
 // For Saved Blogs Feature

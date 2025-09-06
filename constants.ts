@@ -10,7 +10,7 @@ export const IMAGE_GENERATION_MODEL = 'imagen-3.0-generate-002';
 
 
 // SEO Length Constraints
-export const META_DESCRIPTION_MAX_LENGTH = 160;
+export const META_DESCRIPTION_MAX_LENGTH = 150;
 export const META_DESCRIPTION_MIN_LENGTH = 120;
 
 export const TITLE_MAX_LENGTH = 70; // For H1

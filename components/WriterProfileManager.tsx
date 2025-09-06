@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import type { AiWriterProfile, User } from '../types';
 import { Button } from './Button';
 import { AiWriterProfileForm } from './AiWriterProfileForm';
-import { PlusCircleIcon, TrashIcon } from './Icons';
+import { PlusCircleIcon, TrashIcon, DocumentDuplicateIcon } from './Icons';
 
 interface WriterProfileManagerProps {
     profiles: AiWriterProfile[];
@@ -18,7 +18,15 @@ export const WriterProfileManager: React.FC<WriterProfileManagerProps> = ({ prof
         if (currentUser.role === 'admin') {
           return profiles;
         }
-        return profiles.filter(p => p.ownerId === currentUser.id || (currentUser.assignedProfileIds && currentUser.assignedProfileIds.includes(p.id)));
+        return profiles.filter(p => {
+          // Show profiles if:
+          // 1. User owns the profile
+          // 2. User is assigned to the profile
+          // 3. Profile is public (but mark as read-only for non-owners)
+          return p.ownerId === currentUser.id || 
+                 (currentUser.assignedProfileIds && currentUser.assignedProfileIds.includes(p.id)) ||
+                 p.isPublic;
+        });
     }, [currentUser, profiles]);
 
     const handleSaveProfile = (profileToSave: AiWriterProfile) => {
@@ -41,6 +49,29 @@ export const WriterProfileManager: React.FC<WriterProfileManagerProps> = ({ prof
               setEditingProfile(null);
           }
         }
+    };
+    
+    const handleDuplicateProfile = (profileToDuplicate: AiWriterProfile) => {
+        const duplicatedProfile: AiWriterProfile = {
+          ...profileToDuplicate,
+          id: crypto.randomUUID(),
+          ownerId: currentUser.id,
+          agentName: `${profileToDuplicate.agentName} (Copy)`,
+          isPublic: false // New duplicated profiles start as private
+        };
+        
+        setProfiles(prev => [...prev, duplicatedProfile]);
+        setEditingProfile(duplicatedProfile);
+    };
+    
+    const canEditProfile = (profile: AiWriterProfile) => {
+        return currentUser.role === 'admin' || 
+               profile.ownerId === currentUser.id || 
+               (currentUser.assignedProfileIds && currentUser.assignedProfileIds.includes(profile.id));
+    };
+    
+    const canDeleteProfile = (profile: AiWriterProfile) => {
+        return currentUser.role === 'admin' || profile.ownerId === currentUser.id;
     };
 
     return (
@@ -66,7 +97,23 @@ export const WriterProfileManager: React.FC<WriterProfileManagerProps> = ({ prof
                     {visibleProfiles.map(profile => (
                       <li key={profile.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
                         <div className="flex-grow">
-                            <p className="font-semibold text-gray-800">{profile.agentName}</p>
+                            <div className="flex items-center gap-2">
+                                <p className="font-semibold text-gray-800">{profile.agentName}</p>
+                                {profile.isPublic ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        🌍 Public
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        🔒 Private
+                                    </span>
+                                )}
+                                {profile.ownerId !== currentUser.id && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        Shared
+                                    </span>
+                                )}
+                            </div>
                             {currentUser.role === 'admin' && (
                                 <p className="text-xs text-gray-500">
                                     Profile ID: {profile.id} | Owner ID: {profile.ownerId}
@@ -74,10 +121,22 @@ export const WriterProfileManager: React.FC<WriterProfileManagerProps> = ({ prof
                             )}
                         </div>
                         <div className="flex space-x-2 mt-3 sm:mt-0 flex-shrink-0 self-end sm:self-center">
-                          <Button onClick={() => setEditingProfile(profile)} variant="secondary" className="!py-1.5 !px-4">Edit</Button>
-                          <Button onClick={() => handleDeleteProfile(profile.id)} variant="danger" className="!py-1.5 !px-4">
-                            <TrashIcon className="w-4 h-4" />
+                          <Button 
+                            onClick={() => handleDuplicateProfile(profile)} 
+                            variant="secondary" 
+                            className="!py-1.5 !px-4"
+                            title="Create a copy you can edit"
+                          >
+                            <DocumentDuplicateIcon className="w-4 h-4" />
                           </Button>
+                          {canEditProfile(profile) && (
+                            <Button onClick={() => setEditingProfile(profile)} variant="secondary" className="!py-1.5 !px-4">Edit</Button>
+                          )}
+                          {canDeleteProfile(profile) && (
+                            <Button onClick={() => handleDeleteProfile(profile.id)} variant="danger" className="!py-1.5 !px-4">
+                              <TrashIcon className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </li>
                     ))}

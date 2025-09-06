@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import type { AiWriterProfile, User } from '../types';
 import { Button } from './Button';
@@ -8,6 +7,9 @@ import { getUsers, saveUsers } from '../services/userService';
 import { TextInput } from './TextInput';
 import { ApiKeyManager } from './ApiKeyManager';
 import { PasswordManager } from './PasswordManager';
+import EmailConfigComponent from './EmailConfig';
+import { emailService } from '../services/emailService';
+import type { EmailConfig } from '../services/emailService';
 
 interface AdminPageProps {
   profiles: AiWriterProfile[];
@@ -16,7 +18,7 @@ interface AdminPageProps {
 }
 
 // --- User Management Component (for Admins) ---
-const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfiles }) => {
+const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: EmailConfig }> = ({ allProfiles, emailConfig }) => {
   const [users, setUsers] = useState<User[]>([]);
 
   useEffect(() => {
@@ -48,7 +50,7 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
     setUsers(updatedUsers);
 
     
-    saveUsers(updatedUsers);  // Note: saveUsers is async but we don\'t await here for simplicity
+    saveUsers(updatedUsers);  // Note: saveUsers is async but we don't await here for simplicity
     setEditingUser(null);
   };
 
@@ -64,7 +66,7 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
       const updatedUsers = users.filter(u => u.id !== userId);
       setUsers(updatedUsers);
 
-      saveUsers(updatedUsers);  // Note: saveUsers is async but we don\'t await here for simplicity
+      saveUsers(updatedUsers);  // Note: saveUsers is async but we don't await here for simplicity
       if (typeof editingUser !== 'string' && editingUser?.id === userId) {
         setEditingUser(null);
       }
@@ -73,39 +75,86 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
 
   const UserForm: React.FC<{ user: User | null; onSave: (user: User) => void; onCancel: () => void; }> = ({ user, onSave, onCancel }) => {
     const [username, setUsername] = useState(user?.username || '');
+    const [email, setEmail] = useState(user?.email || '');
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<'admin' | 'general'>(user?.role || 'general');
     const [assignedProfileIds, setAssignedProfileIds] = useState<string[]>(user?.assignedProfileIds || []);
+    const [shouldSendInvite, setShouldSendInvite] = useState(false);
     const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setError('');
+      setIsLoading(true);
+      
       if (!username.trim()) {
         setError("Username is required.");
+        setIsLoading(false);
         return;
       }
-      if (!user && !password) {
-        setError("Password is required for new users.");
+      
+      if (shouldSendInvite && !email.trim()) {
+        setError("Email is required when sending invitations.");
+        setIsLoading(false);
         return;
       }
+      
+      if (!user && !password && !shouldSendInvite) {
+        setError("Password is required for new users (or select 'Send Invitation').");
+        setIsLoading(false);
+        return;
+      }
+      
       if (users.some(u => u.username.toLowerCase() === username.toLowerCase() && u.id !== user?.id)) {
         setError("Username already exists.");
+        setIsLoading(false);
         return;
       }
 
-      const updatedUser: User = {
-        id: user?.id || crypto.randomUUID(),
-        username: username.trim(),
-        password: password ? password : user!.password, // This is insecure, but matches the demo structure
-        role,
-        assignedProfileIds: role === 'admin' ? [] : assignedProfileIds, // Admins have all profiles implicitly
-      };
-      onSave(updatedUser);
+      try {
+        let finalPassword = password;
+        
+        // If sending invite, generate temporary password
+        if (shouldSendInvite && emailService.isConfigured()) {
+          finalPassword = emailService.generateTempPassword();
+        }
+
+        const updatedUser: User = {
+          id: user?.id || crypto.randomUUID(),
+          username: username.trim(),
+          email: email.trim() || undefined,
+          password: finalPassword || (user?.password || 'changeme123'),
+          role,
+          assignedProfileIds: role === 'admin' ? [] : assignedProfileIds,
+          isTemporaryPassword: shouldSendInvite
+        };
+        
+        // Send invitation email if requested
+        if (shouldSendInvite && email.trim() && emailService.isConfigured()) {
+          const inviteResult = await emailService.sendInvitationEmail({
+            userEmail: email.trim(),
+            inviterName: 'Admin',
+            tempPassword: finalPassword,
+            loginUrl: window.location.origin,
+            companyName: 'AI SEO Blog Writer'
+          });
+          
+          if (!inviteResult.success) {
+            setError(`User created but invitation failed: ${inviteResult.message}`);
+          }
+        }
+        
+        onSave(updatedUser);
+      } catch (error) {
+        setError(error instanceof Error ? error.message : 'An error occurred');
+      } finally {
+        setIsLoading(false);
+      }
     };
     
     const handleProfileSelection = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+        const selectedOptions = Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value);
         setAssignedProfileIds(selectedOptions);
     };
 
@@ -114,7 +163,33 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
         <h4 className="text-lg font-semibold text-sky-800">{user ? `Edit ${user.username}` : 'Create New User'}</h4>
         {error && <p className="text-red-600 bg-red-100 p-2 rounded-md border border-red-300 text-sm" role="alert">{error}</p>}
         <TextInput label="Username" name="username" value={username} onChange={e => setUsername(e.target.value)} isRequired />
-        <TextInput label={`Password ${user ? '(leave blank to keep current)' : ''}`} name="password" type="password" value={password} onChange={e => setPassword(e.target.value)} isRequired={!user} />
+        <TextInput label="Email Address" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="user@example.com" />
+        
+        {/* Invitation option for new users */}
+        {!user && emailService.isConfigured() && (
+          <div>
+            <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+              <input
+                type="checkbox"
+                checked={shouldSendInvite}
+                onChange={(e) => setShouldSendInvite(e.target.checked)}
+                className="mr-2"
+              />
+              📧 Send invitation email (generates temporary password automatically)
+            </label>
+          </div>
+        )}
+        
+        <TextInput 
+          label={`Password ${user ? '(leave blank to keep current)' : shouldSendInvite ? '(auto-generated)' : ''}`} 
+          name="password" 
+          type="password" 
+          value={shouldSendInvite ? '' : password} 
+          onChange={e => setPassword(e.target.value)} 
+          isRequired={!user && !shouldSendInvite}
+          disabled={shouldSendInvite}
+          placeholder={shouldSendInvite ? 'Temporary password will be generated and sent via email' : ''}
+        />
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
@@ -133,17 +208,17 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
                     onChange={handleProfileSelection} 
                     className="w-full h-32 px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                 >
-                    {allProfiles.map(profile => (
+                    {allProfiles.filter(profile => profile.isPublic).map(profile => (
                         <option key={profile.id} value={profile.id}>{profile.agentName}</option>
                     ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple profiles.</p>
+                <p className="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple profiles. Only public profiles can be assigned to users.</p>
              </div>
         )}
 
         <div className="flex space-x-3 pt-2">
-          <Button type="submit" className="bg-sky-600 hover:bg-sky-700 text-white flex-1">
-            <SaveIcon className="w-5 h-5 mr-2" /> Save User
+          <Button type="submit" className="bg-sky-600 hover:bg-sky-700 text-white flex-1" disabled={isLoading}>
+            <SaveIcon className="w-5 h-5 mr-2" /> {isLoading ? 'Saving...' : 'Save User'}
           </Button>
           <Button type="button" onClick={onCancel} variant="secondary" className="flex-1">
             Cancel
@@ -210,96 +285,85 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[] }> = ({ allProfi
   );
 };
 
-
-// --- Main Admin Page Component ---
 export const AdminPage: React.FC<AdminPageProps> = ({ profiles, setCurrentView, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'apikeys' | 'passwords'>('users');
-  const [users, setUsers] = useState<User[]>([]);
-  const [refreshUsers, setRefreshUsers] = useState(0);
+  const [activeTab, setActiveTab] = useState<'users' | 'api' | 'password' | 'email'>('users');
+  const [emailConfig, setEmailConfig] = useState<EmailConfig>();
 
-  React.useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        const loadedUsers = await getUsers();
-        setUsers(loadedUsers);
-      } catch (e) {
-        console.error('Failed to load users:', e);
-      }
-    };
-    loadUsers();
-  }, [refreshUsers]);
-
-  const TabButton: React.FC<{ tabId: typeof activeTab; icon: React.ReactNode; label: string; onClick: () => void }> = ({ tabId, icon, label, onClick }) => (
-    <button
-      onClick={onClick}
-      className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors
-        ${activeTab === tabId ? 'bg-sky-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'}`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
+  // Initialize email service when config changes
+  useEffect(() => {
+    if (emailConfig) {
+      emailService.configure(emailConfig);
+    }
+  }, [emailConfig]);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 p-4 md:p-8 font-sans">
-      <header className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-sky-700">Settings</h1>
-        <Button
-          onClick={() => setCurrentView('main')}
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold text-sky-700">Admin Dashboard</h1>
+        <Button 
+          onClick={() => setCurrentView('main')} 
           variant="secondary"
-          className="bg-white border-gray-300 hover:bg-gray-100"
+          className="flex items-center"
         >
-          <ArrowLeftIcon className="w-5 h-5 mr-2" /> Back to Main App
+          <ArrowLeftIcon className="w-4 h-4 mr-2" />
+          Back to Main App
         </Button>
-      </header>
+      </div>
 
-      <div className="max-w-4xl mx-auto">
-        {currentUser.role === 'admin' ? (
-          <>
-            <nav className="flex flex-wrap items-center justify-center gap-2 mb-8 border-b border-gray-300 pb-4">
-              <TabButton 
-                tabId="users" 
-                onClick={() => setActiveTab('users')} 
-                icon={<UserGroupIcon className="w-5 h-5" />} 
-                label="User Management" 
-              />
-              <TabButton 
-                tabId="passwords" 
-                onClick={() => setActiveTab('passwords')} 
-                icon={<SaveIcon className="w-5 h-5" />} 
-                label="Password Management" 
-              />
-              <TabButton 
-                tabId="apikeys" 
-                onClick={() => setActiveTab('apikeys')} 
-                icon={<SaveIcon className="w-5 h-5" />} 
-                label="API Keys" 
-              />
-            </nav>
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200 mb-6">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          {[
+            { key: 'users', label: 'User Management', icon: UserGroupIcon },
+            { key: 'email', label: 'Email Configuration', icon: UserGroupIcon },
+            { key: 'api', label: 'API Configuration', icon: UserGroupIcon },
+            { key: 'password', label: 'Password Management', icon: UserGroupIcon }
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key as any)}
+              className={`${
+                activeTab === key
+                  ? 'border-sky-500 text-sky-600'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+              } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center`}
+            >
+              <Icon className="w-5 h-5 mr-2" />
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
 
-            {activeTab === 'users' && (
-              <SectionCard title="User Management" icon={<UserGroupIcon className="w-6 h-6 text-sky-600"/>}>
-                <UserManagement allProfiles={profiles} />
-              </SectionCard>
-            )}
+      {/* Tab Content */}
+      <div>
+        {activeTab === 'users' && (
+          <SectionCard title="User Management" icon={<UserGroupIcon className="w-6 h-6 text-sky-600"/>}>
+            <UserManagement allProfiles={profiles} emailConfig={emailConfig} />
+          </SectionCard>
+        )}
 
-            {activeTab === 'passwords' && (
-              <PasswordManager 
-                currentUser={currentUser} 
-                allUsers={users}
-                onUsersChange={() => setRefreshUsers(prev => prev + 1)}
-              />
-            )}
+        {activeTab === 'email' && (
+          <SectionCard title="Email Configuration" icon={<UserGroupIcon className="w-6 h-6 text-sky-600"/>}>
+            <EmailConfigComponent 
+              config={emailConfig} 
+              onConfigUpdate={setEmailConfig} 
+            />
+          </SectionCard>
+        )}
 
-            {activeTab === 'apikeys' && (
-              <ApiKeyManager currentUser={currentUser} />
-            )}
-          </>
-        ) : (
-           <p className="text-center text-gray-500 py-6">You do not have permission to view settings.</p>
+        {activeTab === 'api' && (
+          <SectionCard title="API Configuration" icon={<UserGroupIcon className="w-6 h-6 text-sky-600"/>}>
+            <ApiKeyManager />
+          </SectionCard>
+        )}
+
+        {activeTab === 'password' && (
+          <SectionCard title="Password Management" icon={<UserGroupIcon className="w-6 h-6 text-sky-600"/>}>
+            <PasswordManager currentUser={currentUser} />
+          </SectionCard>
         )}
       </div>
     </div>
   );
 };
-    

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { AiWriterProfile } from '../types';
+import type { AiWriterProfile, GoogleSearchConfig } from '../types';
 import { TextInput } from './TextInput';
 import { TextAreaInput } from './TextAreaInput';
 import { Button } from './Button';
@@ -13,6 +13,7 @@ import {
 } from '../constants';
 import { generateWebsiteContext, RateLimitError } from '../services/geminiService';
 import { SectionCard } from './SectionCard';
+import GoogleSearchConfigComponent from './GoogleSearchConfig';
 
 interface AiWriterProfileFormProps {
   profile?: AiWriterProfile | null; 
@@ -34,6 +35,12 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
   const [sitemapPages, setSitemapPages] = useState<{ url: string; selected: boolean }[]>([]);
   const [websiteContext, setWebsiteContext] = useState('');
   const [isGeneratingContext, setIsGeneratingContext] = useState(false);
+
+  // Google Search Configuration state
+  const [googleSearchConfig, setGoogleSearchConfig] = useState<GoogleSearchConfig | undefined>(undefined);
+  
+  // Profile visibility state
+  const [isPublic, setIsPublic] = useState<boolean>(false);
   
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -47,6 +54,8 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       setImagePromptInstructions(profile.imagePromptInstructions || '');
       setSitemapPages(profile.sitemapPages || []);
       setWebsiteContext(profile.websiteContext || '');
+      setGoogleSearchConfig(profile.googleSearchConfig);
+      setIsPublic(profile.isPublic || false);
       setUrlListInput(''); // Clear input on profile change
     } else {
       // Reset form for new profile
@@ -59,6 +68,8 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       setUrlListInput('');
       setSitemapPages([]);
       setWebsiteContext('');
+      setGoogleSearchConfig(undefined);
+      setIsPublic(false);
     }
   }, [profile]);
 
@@ -97,6 +108,8 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       imagePromptInstructions,
       sitemapPages,
       websiteContext,
+      googleSearchConfig,
+      isPublic,
     });
     
     if (!profile) { // Reset form only if it was a new creation
@@ -109,6 +122,8 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
         setUrlListInput('');
         setSitemapPages([]);
         setWebsiteContext('');
+        setGoogleSearchConfig(undefined);
+        setIsPublic(false);
     }
   };
 
@@ -317,6 +332,57 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
                   </div>
               )}
           </div>
+      </SectionCard>
+
+      <SectionCard title="External Link Search Configuration" icon={<SparklesIcon className="w-6 h-6 text-sky-600"/>} startOpen={false}>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Configure Google Custom Search API for this profile to get high-quality external link suggestions from authoritative sources.
+          </p>
+          
+          <GoogleSearchConfigComponent
+            config={googleSearchConfig}
+            onConfigUpdate={setGoogleSearchConfig}
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Profile Visibility" icon={<GlobeAltIcon className="w-6 h-6 text-sky-600"/>} startOpen={true}>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Choose whether this profile should be private (only visible to you) or public (visible to all users).
+          </p>
+          
+          <div className="flex items-center space-x-3">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                name="visibility"
+                checked={!isPublic}
+                onChange={() => setIsPublic(false)}
+                className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300"
+              />
+              <span className="ml-2 text-sm text-gray-700">
+                🔒 Private - Only visible to me
+              </span>
+            </label>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <label className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                name="visibility"
+                checked={isPublic}
+                onChange={() => setIsPublic(true)}
+                className="h-4 w-4 text-sky-600 focus:ring-sky-500 border-gray-300"
+              />
+              <span className="ml-2 text-sm text-gray-700">
+                🌍 Public - Visible to all users (they can duplicate but not edit)
+              </span>
+            </label>
+          </div>
+        </div>
       </SectionCard>
 
       <div className="flex space-x-4 pt-4">
