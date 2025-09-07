@@ -998,6 +998,44 @@ async function verifyLinkQuality(url: string): Promise<{ isValid: boolean; statu
   }
 }
 
+// Helper function to detect placeholder URLs that the AI might generate
+function isPlaceholderUrl(url: string): boolean {
+  const placeholderPatterns = [
+    /^URL_TO_/i,
+    /^https?:\/\/example\./i,
+    /^https?:\/\/your-website\./i,
+    /^https?:\/\/placeholder\./i,
+    /\[URL\]/i,
+    /INSERT_URL/i,
+    /REPLACE_WITH_URL/i,
+    /^https?:\/\/\[/i, // URLs starting with https://[
+  ];
+  
+  return placeholderPatterns.some(pattern => pattern.test(url));
+}
+
+// Helper function to validate URL format
+function isValidUrl(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    // Must have http or https protocol
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      return false;
+    }
+    // Must have a valid hostname
+    if (!urlObj.hostname || urlObj.hostname.length < 3) {
+      return false;
+    }
+    // Must have a valid TLD
+    if (!urlObj.hostname.includes('.') || urlObj.hostname.endsWith('.')) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Domain reputation checker
 function isReputableDomain(url: string): boolean {
   try {
@@ -1161,6 +1199,8 @@ async function suggestExternalLinksWithGemini(
 - Using links from your training knowledge
 - Linking to personal blogs, WordPress.com, or content farms
 - Suggesting homepage URLs or broken links
+- Using placeholder URLs like "URL_TO_TOPIC" or "https://example.com/article"
+- Generating fake or non-existent URLs
 
 🚨 **CRITICAL JSON REQUIREMENT:** 
 You MUST return ONLY a valid JSON array. NO explanatory text, NO commentary, NO reasoning. 
@@ -1240,6 +1280,18 @@ ${mainContent}
     
     for (const suggestion of rawSuggestions) {
       console.log(`🔍 Verifying link: ${suggestion.url}`);
+      
+      // First check if it's a placeholder URL (common issue)
+      if (isPlaceholderUrl(suggestion.url)) {
+        console.log(`❌ Skipping placeholder URL: ${suggestion.url}`);
+        continue;
+      }
+      
+      // Check if it's a properly formatted URL
+      if (!isValidUrl(suggestion.url)) {
+        console.log(`❌ Skipping invalid URL format: ${suggestion.url}`);
+        continue;
+      }
       
       // Check domain reputation first (faster)
       if (!isReputableDomain(suggestion.url)) {
