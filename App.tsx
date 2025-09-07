@@ -10,6 +10,7 @@ import { Button } from './components/Button';
 import { SectionCard } from './components/SectionCard';
 import { BlogPreview } from './components/BlogPreview';
 import { ContentEnhancementUI } from './components/ContentEnhancementUI';
+import { KeywordResearch } from './components/KeywordResearch';
 import {
   generateBlogPost,
   generateImprovedHeadline,
@@ -238,7 +239,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
   // Navigation state
   const [currentView, setCurrentView] = useState<'main' | 'admin'>('main');
-  const [activeTab, setActiveTab] = useState<'write' | 'topics' | 'profiles' | 'blogs'>('write');
+  const [activeTab, setActiveTab] = useState<'write' | 'topics' | 'keywords' | 'profiles' | 'blogs'>('write');
 
   // Profiles state
   const [writerProfiles, setWriterProfiles] = useState<AiWriterProfile[]>([]);
@@ -256,6 +257,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
   const [keywordAnalysisResult, setKeywordAnalysisResult] = useState<KeywordVolumeAnalysisResult | null>(null);
   const [keywordAnalysisError, setKeywordAnalysisError] = useState<string | null>(null);
+  const [selectedKeywordForTopic, setSelectedKeywordForTopic] = useState<string>('');
   
   const [externalLinkSuggestions, setExternalLinkSuggestions] = useState<ExternalLinkSuggestion[]>([]);
   const [externalLinkError, setExternalLinkError] = useState<string | null>(null);
@@ -348,6 +350,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
       imagePromptInstructions: activeWriterProfile.imagePromptInstructions,
       websiteContext: activeWriterProfile.websiteContext,
       googleSearchConfig: activeWriterProfile.googleSearchConfig,
+      keywordsEverywhereConfig: activeWriterProfile.keywordsEverywhereConfig,
     };
   }, [activeWriterProfile]);
 
@@ -1023,63 +1026,120 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
     });
     
     // Debug: Let's check what's in the content
-    const plainContent = mainContent.replace(/<[^>]*>/g, ''); // Remove HTML tags for comparison
+    const plainContent = mainContent.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
     console.log('🔍 Searching for anchor text in content...');
     console.log('Anchor text:', `"${suggestion.anchorText}"`);
     console.log('Context:', `"${suggestion.context?.substring(0, 150)}..."`);
-    console.log('Content has anchor text?', plainContent.includes(suggestion.anchorText));
-    console.log('Content has context?', suggestion.context ? plainContent.includes(suggestion.context) : 'No context provided');
     
-    // First, check if the anchor text exists anywhere in the content (more flexible approach)
-    if (mainContent.includes(suggestion.anchorText)) {
-        console.log('✅ Found anchor text in content, replacing...');
-        const linkHtml = `<a href="${suggestion.url}" target="_blank" rel="noopener noreferrer">${suggestion.anchorText}</a>`;
+    // Check if the anchor text already exists as a link
+    const alreadyLinked = mainContent.includes(`<a href=`) && 
+                         mainContent.includes(`>${suggestion.anchorText}</a>`);
+    
+    if (alreadyLinked) {
+        console.log('⚠️ Anchor text already appears to be linked');
+        alert(`The text "${suggestion.anchorText}" appears to already be a link. Please check your content.`);
+        setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
+        return;
+    }
+    
+    // Check both HTML and plain content for anchor text
+    const anchorInHTML = mainContent.includes(suggestion.anchorText);
+    const anchorInPlain = plainContent.includes(suggestion.anchorText);
+    const contextInHTML = suggestion.context ? mainContent.includes(suggestion.context.trim()) : false;
+    
+    console.log('Content has anchor text (HTML)?', anchorInHTML);
+    console.log('Content has anchor text (plain)?', anchorInPlain);
+    console.log('Content has context (HTML)?', contextInHTML);
+    
+    // Create the link HTML
+    const linkHtml = `<a href="${suggestion.url}" target="_blank" rel="noopener noreferrer">${suggestion.anchorText}</a>`;
+    
+    // Strategy 1: Direct anchor text replacement in HTML
+    if (anchorInHTML) {
+        console.log('✅ Found anchor text in HTML content, replacing...');
         
-        // Replace the first occurrence of the anchor text with the link
-        const newContent = mainContent.replace(suggestion.anchorText, linkHtml);
+        // Use a more precise regex replacement to avoid replacing partial matches
+        const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(`\\b${escapeRegex(suggestion.anchorText)}\\b`, 'i');
         
-        if (newContent !== mainContent) {
-            setMainContent(newContent);
-            console.log('✅ Successfully added external link');
+        if (pattern.test(mainContent)) {
+            const newContent = mainContent.replace(pattern, linkHtml);
             
-            // Remove the suggestion from the list once it's used
-            setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
-        } else {
-            console.log('❌ Replace failed - content unchanged');
-            alert(`Could not replace anchor text "${suggestion.anchorText}". Please add the link manually.`);
-        }
-    } else if (suggestion.context && mainContent.includes(suggestion.context)) {
-        console.log('✅ Found context in content, replacing within context...');
-        // Fallback: try to find the context sentence
-        const linkHtml = `<a href="${suggestion.url}" target="_blank" rel="noopener noreferrer">${suggestion.anchorText}</a>`;
-        const newContext = suggestion.context.replace(suggestion.anchorText, linkHtml);
-
-        if (newContext !== suggestion.context) {
-            const newContent = mainContent.replace(suggestion.context, newContext);
-            setMainContent(newContent);
-            console.log('✅ Successfully added external link via context');
-            
-            setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
-        } else {
-            console.log('❌ Context replace failed - context unchanged');
-            alert(`Could not replace anchor text "${suggestion.anchorText}" within context. Please add the link manually.`);
-        }
-    } else {
-        console.log('❌ Neither anchor text nor context found in content');
-        console.log('Trying fuzzy matching...');
-        
-        // Try fuzzy matching - look for similar phrases
-        const words = suggestion.anchorText.split(' ');
-        const plainContent = mainContent.replace(/<[^>]*>/g, '');
-        
-        for (const word of words) {
-            if (word.length > 3 && plainContent.toLowerCase().includes(word.toLowerCase())) {
-                console.log(`🔍 Found word "${word}" in content`);
+            if (newContent !== mainContent) {
+                setMainContent(newContent);
+                console.log('✅ Successfully added external link via regex');
+                setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
+                return;
             }
         }
         
-        alert(`Could not find anchor text "${suggestion.anchorText}" or context sentence in content. The content may have been edited. Please add the link manually.`);
+        // Fallback to simple string replacement
+        const newContent = mainContent.replace(suggestion.anchorText, linkHtml);
+        if (newContent !== mainContent) {
+            setMainContent(newContent);
+            console.log('✅ Successfully added external link via simple replace');
+            setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
+            return;
+        }
     }
+    
+    // Strategy 2: Context-based replacement
+    if (suggestion.context && contextInHTML) {
+        console.log('✅ Found context in HTML content, replacing within context...');
+        const contextTrimmed = suggestion.context.trim();
+        
+        // Try to replace within the context
+        if (contextTrimmed.includes(suggestion.anchorText)) {
+            const newContext = contextTrimmed.replace(suggestion.anchorText, linkHtml);
+            const newContent = mainContent.replace(contextTrimmed, newContext);
+            
+            if (newContent !== mainContent) {
+                setMainContent(newContent);
+                console.log('✅ Successfully added external link via context');
+                setExternalLinkSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
+                return;
+            }
+        }
+    }
+    
+    // Strategy 3: Try finding in plain text but replacing in HTML
+    if (anchorInPlain && !anchorInHTML) {
+        console.log('🔍 Found in plain text, attempting HTML replacement...');
+        // This means the text exists but might be split across HTML tags
+        // Let's try a more sophisticated approach
+        
+        const words = suggestion.anchorText.split(' ');
+        if (words.length > 1) {
+            // Try to find and replace each word boundary
+            let tempContent = mainContent;
+            const firstWord = words[0];
+            const lastWord = words[words.length - 1];
+            
+            if (tempContent.includes(firstWord) && tempContent.includes(lastWord)) {
+                console.log('🔍 Found first and last words, attempting replacement...');
+                // This is a complex case that might need manual intervention
+            }
+        }
+    }
+    
+    // Final fallback - show helpful error message
+    console.log('❌ Could not add link automatically');
+    console.log('Debug info:', {
+      anchorTextLength: suggestion.anchorText.length,
+      contentSample: mainContent.substring(0, 200) + '...',
+      plainContentSample: plainContent.substring(0, 200) + '...'
+    });
+    
+    if (anchorInPlain && !anchorInHTML) {
+        alert(`Found the text "${suggestion.anchorText}" in content but it may be split across HTML tags. Please add the link manually or try regenerating the content.`);
+    } else if (!anchorInPlain && !anchorInHTML) {
+        alert(`Could not find anchor text "${suggestion.anchorText}" in content. The content may have been modified. Please add the link manually.`);
+    } else {
+        alert(`Unexpected error adding link. Please try again or add manually.`);
+    }
+    
+    // Don't remove the suggestion if we couldn't add it - let user try again
+    console.log('Link addition failed, keeping suggestion in list for retry');
   }, [mainContent]);
 
   if (currentView === 'admin') {
@@ -1134,6 +1194,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
       <nav className="flex flex-wrap items-center justify-center gap-2 mb-8 border-b border-gray-300 pb-4">
           <TabButton tabId="write" onClick={() => setActiveTab('write')} icon={<DocumentTextIcon className="w-5 h-5" />} label="Write Blog" />
           <TabButton tabId="topics" onClick={() => setActiveTab('topics')} icon={<GlobeAltIcon className="w-5 h-5" />} label="Find Topic" />
+          <TabButton tabId="keywords" onClick={() => setActiveTab('keywords')} icon={<LightBulbIcon className="w-5 h-5" />} label="Keyword Research" />
           <TabButton tabId="profiles" onClick={() => setActiveTab('profiles')} icon={<UserCircleIcon className="w-5 h-5" />} label="AI Writer Profiles" />
           <TabButton tabId="blogs" onClick={() => setActiveTab('blogs')} icon={<BookmarkSquareIcon className="w-5 h-5" />} label="Saved Blogs" />
       </nav>
@@ -1753,8 +1814,26 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             <TopicFinder
               onSetDeepResearchInfo={handleSetDeepResearchInfo}
               onHeadlineResearchComplete={handleHeadlineResearchComplete}
+              selectedKeyword={selectedKeywordForTopic}
             />
           </SectionCard>
+        </div>
+      )}
+
+      {activeTab === 'keywords' && (
+        <div className="max-w-6xl mx-auto">
+          <KeywordResearch 
+            profileData={getActiveProfileData()}
+            onKeywordSelect={(keyword, data) => {
+              // Set the selected keyword as focus keyword and switch to Find Topic tab
+              setSeoSettings(prev => ({
+                ...prev,
+                focusKeywords: keyword
+              }));
+              setSelectedKeywordForTopic(keyword);
+              setActiveTab('topics');
+            }}
+          />
         </div>
       )}
 

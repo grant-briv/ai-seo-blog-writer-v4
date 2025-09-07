@@ -3,7 +3,7 @@ import { Button } from './Button';
 import { TextInput } from './TextInput';
 import { TextAreaInput } from './TextAreaInput';
 import { SectionCard } from './SectionCard';
-import { KeyIcon, EyeIcon, EyeSlashIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon } from './Icons';
+import { KeyIcon, EyeIcon, EyeSlashIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, SearchIcon } from './Icons';
 import type { ApiKey } from '../services/apiKeyService';
 import { 
   getAllApiKeys, 
@@ -14,6 +14,8 @@ import {
   initializeApiKeys,
   removeDuplicateApiKeys 
 } from '../services/apiKeyService';
+import KeywordsEverywhereConfig from './KeywordsEverywhereConfig';
+import type { KeywordsEverywhereConfig as KWConfig } from '../types';
 
 interface ApiKeyManagerProps {
   currentUser: { role: string };
@@ -30,10 +32,36 @@ export const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ currentUser }) => 
   const [newKeyDescription, setNewKeyDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [keywordsEverywhereConfig, setKeywordsEverywhereConfig] = useState<KWConfig>({
+    apiKey: '',
+    isEnabled: false
+  });
 
   useEffect(() => {
     loadApiKeys();
+    loadKeywordsEverywhereConfig();
   }, []);
+
+  const loadKeywordsEverywhereConfig = () => {
+    try {
+      const saved = localStorage.getItem('keywordsEverywhereConfig');
+      if (saved) {
+        setKeywordsEverywhereConfig(JSON.parse(saved));
+      }
+    } catch (err) {
+      console.error('Failed to load Keywords Everywhere config:', err);
+    }
+  };
+
+  const handleKeywordsEverywhereConfigUpdate = (config: KWConfig) => {
+    try {
+      setKeywordsEverywhereConfig(config);
+      localStorage.setItem('keywordsEverywhereConfig', JSON.stringify(config));
+    } catch (err) {
+      console.error('Failed to save Keywords Everywhere config:', err);
+      setError('Failed to save Keywords Everywhere configuration');
+    }
+  };
 
   const loadApiKeys = async () => {
     try {
@@ -320,6 +348,13 @@ export const ApiKeyManager: React.FC<ApiKeyManagerProps> = ({ currentUser }) => 
             </Button>
           )}
         </div>
+      </SectionCard>
+
+      <SectionCard title="Keywords Everywhere Configuration" icon={<SearchIcon className="w-6 h-6 text-blue-600" />}>
+        <KeywordsEverywhereConfig 
+          config={keywordsEverywhereConfig}
+          onConfigUpdate={handleKeywordsEverywhereConfigUpdate}
+        />
       </SectionCard>
 
       <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">

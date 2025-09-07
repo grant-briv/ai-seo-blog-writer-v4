@@ -354,7 +354,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ profiles, setCurrentView, 
 
         {activeTab === 'api' && (
           <SectionCard title="API Configuration" icon={<UserGroupIcon className="w-6 h-6 text-sky-600"/>}>
-            <ApiKeyManager />
+            <ApiKeyManager currentUser={currentUser} />
           </SectionCard>
         )}
 

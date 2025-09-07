@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { AiWriterProfile, GoogleSearchConfig } from '../types';
+import type { AiWriterProfile, GoogleSearchConfig, KeywordsEverywhereConfig } from '../types';
 import { TextInput } from './TextInput';
 import { TextAreaInput } from './TextAreaInput';
 import { Button } from './Button';
@@ -14,6 +14,7 @@ import {
 import { generateWebsiteContext, RateLimitError } from '../services/geminiService';
 import { SectionCard } from './SectionCard';
 import GoogleSearchConfigComponent from './GoogleSearchConfig';
+import KeywordsEverywhereConfigComponent from './KeywordsEverywhereConfig';
 
 interface AiWriterProfileFormProps {
   profile?: AiWriterProfile | null; 
@@ -39,6 +40,9 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
   // Google Search Configuration state
   const [googleSearchConfig, setGoogleSearchConfig] = useState<GoogleSearchConfig | undefined>(undefined);
   
+  // Keywords Everywhere Configuration state
+  const [keywordsEverywhereConfig, setKeywordsEverywhereConfig] = useState<KeywordsEverywhereConfig | undefined>(undefined);
+  
   // Profile visibility state
   const [isPublic, setIsPublic] = useState<boolean>(false);
   
@@ -55,6 +59,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       setSitemapPages(profile.sitemapPages || []);
       setWebsiteContext(profile.websiteContext || '');
       setGoogleSearchConfig(profile.googleSearchConfig);
+      setKeywordsEverywhereConfig(profile.keywordsEverywhereConfig);
       setIsPublic(profile.isPublic || false);
       setUrlListInput(''); // Clear input on profile change
     } else {
@@ -69,6 +74,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       setSitemapPages([]);
       setWebsiteContext('');
       setGoogleSearchConfig(undefined);
+      setKeywordsEverywhereConfig(undefined);
       setIsPublic(false);
     }
   }, [profile]);
@@ -109,6 +115,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       sitemapPages,
       websiteContext,
       googleSearchConfig,
+      keywordsEverywhereConfig,
       isPublic,
     });
     
@@ -123,6 +130,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
         setSitemapPages([]);
         setWebsiteContext('');
         setGoogleSearchConfig(undefined);
+        setKeywordsEverywhereConfig(undefined);
         setIsPublic(false);
     }
   };
@@ -343,6 +351,19 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
           <GoogleSearchConfigComponent
             config={googleSearchConfig}
             onConfigUpdate={setGoogleSearchConfig}
+          />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Keyword Research Configuration" icon={<SparklesIcon className="w-6 h-6 text-blue-600"/>} startOpen={false}>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Configure Keywords Everywhere API for advanced keyword research and analysis.
+          </p>
+          
+          <KeywordsEverywhereConfigComponent
+            config={keywordsEverywhereConfig}
+            onConfigUpdate={setKeywordsEverywhereConfig}
           />
         </div>
       </SectionCard>

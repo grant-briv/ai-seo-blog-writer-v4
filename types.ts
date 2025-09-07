@@ -41,6 +41,7 @@ export interface AiWriterProfile {
   sitemapPages?: { url: string; selected: boolean; }[];
   websiteContext?: string;
   googleSearchConfig?: GoogleSearchConfig; // Profile-specific search configuration
+  keywordsEverywhereConfig?: KeywordsEverywhereConfig; // Profile-specific keyword research configuration
   isPublic?: boolean; // Whether the profile is public (shareable) or private
 }
 
@@ -48,6 +49,12 @@ export interface AiWriterProfile {
 export interface GoogleSearchConfig {
   apiKey: string;
   searchEngineId: string;
+  isEnabled: boolean;
+}
+
+// Keywords Everywhere configuration for profiles
+export interface KeywordsEverywhereConfig {
+  apiKey: string;
   isEnabled: boolean;
 }
 
@@ -61,6 +68,7 @@ export interface WriterProfileData {
   imagePromptInstructions?: string; // For image generation guidelines
   websiteContext?: string;
   googleSearchConfig?: GoogleSearchConfig; // Profile-specific search configuration
+  keywordsEverywhereConfig?: KeywordsEverywhereConfig; // Profile-specific keyword research configuration
 }
 
 // For Social Post Generator
@@ -154,6 +162,7 @@ export interface Article {
   link: string;
   snippet: string;
   stats?: ArticleStats;
+  source?: string; // 'Google News', 'Reddit', 'Twitter', etc.
 }
 
 export interface GroundingSource {
@@ -164,6 +173,22 @@ export interface GroundingSource {
 export interface GoogleNewsSearchResult {
   articles: Article[];
   groundingSources: GroundingSource[];
+}
+
+export interface TrendAnalysis {
+  trendScore: number;
+  trendDirection: 'rising' | 'declining' | 'stable';
+  keyInsights: string[];
+}
+
+export interface EnhancedSearchResult {
+  articles: Article[];
+  groundingSources: GroundingSource[];
+  trendAnalysis: TrendAnalysis;
+  diverseSources: {
+    reddit: Article[];
+    twitter: Article[];
+  };
 }
 
 // Content Structure Enhancement Types

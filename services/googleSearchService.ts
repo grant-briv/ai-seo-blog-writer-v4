@@ -224,8 +224,9 @@ export class GoogleSearchService {
     searchResult: { title: string; snippet: string; displayLink: string }, 
     topic: string
   ): { anchorText: string; context: string } | null {
-    // Remove HTML tags for text analysis
-    const plainText = blogContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    // Remove heading tags (H1, H2, H3, H4) and their content first, then remove all other HTML tags
+    const contentWithoutHeadings = blogContent.replace(/<h[1-4][^>]*>.*?<\/h[1-4]>/gi, ' ');
+    const plainText = contentWithoutHeadings.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
     
     // Split into sentences, filtering out very short ones
     const sentences = plainText.split(/[.!?]+/).filter(s => s.trim().length > 20);

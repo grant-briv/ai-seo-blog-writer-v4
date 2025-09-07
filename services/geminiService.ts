@@ -689,15 +689,42 @@ export async function deepResearchOnTopic(title: string, link: string, snippet: 
     try {
         const response = await aiClient.models.generateContent({
             model: DEFAULT_TEXT_MODEL,
-            contents: `Based on the information found at the URL "${link}", please provide a detailed summary of the article titled "${title}". Focus on the key points, data, and conclusions. The initial snippet is: "${snippet}". Structure the output as a comprehensive research summary that can be used as source material for a blog post. Use markdown for formatting (headings, bullet points).`,
+            contents: `You are a professional research analyst. Conduct comprehensive research on the article titled "${title}" from ${link}. 
+
+Initial snippet: "${snippet}"
+
+Provide a detailed analysis following this structure:
+
+## Executive Summary
+[2-3 sentence summary of the main points]
+
+## Key Findings
+[Bullet points of the most important discoveries, facts, or conclusions]
+
+## Supporting Data & Statistics
+[Any numbers, percentages, study results, or quantitative data mentioned]
+
+## Expert Opinions & Quotes
+[Notable quotes from experts, officials, or key stakeholders]
+
+## Implications & Impact
+[What this means for the industry/topic, potential consequences]
+
+## Actionable Insights
+[Practical takeaways that could be used in blog content]
+
+## Related Topics to Explore
+[2-3 related areas that could be investigated further]
+
+Use markdown formatting throughout. If specific sections have no relevant information, note "No relevant data found" rather than omitting the section.`,
             config: {
-                tools: [{ googleSearch: {} }] // Using general search with a specific URI is a good pattern
+                tools: [{ googleSearch: {} }]
             }
         });
 
         const researchSummary = response.text || "[No detailed summary could be generated from the source.]";
         
-        return `### Research on: ${title}\n\n**Source URL:** ${link}\n\n${researchSummary}`;
+        return `# Deep Research Analysis\n\n**Article:** ${title}\n**Source:** ${link}\n**Original Snippet:** ${snippet}\n\n---\n\n${researchSummary}\n\n---\n\n*Research completed: ${new Date().toISOString().split('T')[0]}*`;
     } catch (error) {
         handleApiError(error, 'deepResearchOnTopic');
     }
@@ -796,18 +823,46 @@ export async function researchHeadlineIdea(headline: string): Promise<string> {
     try {
         const response = await aiClient.models.generateContent({
             model: DEFAULT_TEXT_MODEL,
-            contents: `You are an expert research assistant. Your goal is to conduct a thorough analysis of a given headline topic and provide a comprehensive summary.
+            contents: `You are a strategic content researcher. Analyze the headline "${headline}" and provide comprehensive research that will serve as the foundation for creating high-quality blog content.
 
-            Follow this multi-step process:
-            1.  **Formulate Search Queries:** Based on the headline "${headline}", create 2-3 effective search queries to gather diverse information.
-            2.  **Execute Search:** Use your Google Search tool to find relevant articles, studies, and data points using the queries you formulated.
-            3.  **Synthesize Findings:** Analyze the search results and synthesize the information into a detailed research summary. This summary will be used as the foundation for writing a blog post. It should cover key arguments, statistics, different perspectives, and actionable insights.
+**Research Framework:**
 
-            **Output Formatting:**
-            - Structure the entire summary using markdown for clarity (e.g., use H2s or H3s for sections, bullet points for lists).
-            - **CRITICAL:** If, after searching, you cannot find sufficient information to create a meaningful summary, you MUST respond with ONLY the exact phrase: "Research was inconclusive." Do not add any other text.
+## Topic Validation & Market Analysis
+- Is this topic currently relevant and trending?
+- What's the search interest and audience demand?
+- Who is the target audience for this topic?
 
-            Begin your research.`,
+## Current Landscape Analysis
+- Latest developments and news in this area
+- Key players, companies, or experts involved
+- Recent changes or updates to consider
+
+## Content Angle Opportunities
+- Unique perspectives not widely covered
+- Controversial or debatable aspects
+- Personal stories or case studies available
+- Data-driven insights possible
+
+## Supporting Evidence & Data
+- Statistics, research studies, surveys
+- Expert quotes and authoritative sources
+- Industry reports or market data
+- Real-world examples and success stories
+
+## Content Strategy Recommendations
+- Best content format (how-to, listicle, analysis, etc.)
+- Optimal content length and depth
+- Key SEO keywords to target
+- Internal/external linking opportunities
+
+## Competitive Intelligence
+- What content already exists on this topic?
+- Content gaps in existing coverage
+- Ways to differentiate and add unique value
+
+Use detailed research and provide specific, actionable insights. Structure with clear markdown formatting.
+
+**CRITICAL:** If insufficient information exists for meaningful analysis, respond only with: "Research was inconclusive."`,
             config: {
                 tools: [{ googleSearch: {} }]
             }
@@ -823,7 +878,7 @@ export async function researchHeadlineIdea(headline: string): Promise<string> {
             throw new Error("Deep research was inconclusive. The topic may be too niche or no relevant results were found by the AI.");
         }
         
-        return `### Research on Headline Idea: ${headline}\n\n${researchSummary}`;
+        return `# Strategic Content Research\n\n**Headline Analysis:** ${headline}\n\n---\n\n${researchSummary}\n\n---\n\n*Strategic analysis completed: ${new Date().toISOString().split('T')[0]}*`;
     } catch (error) {
       if (error instanceof Error && (error.message.includes('429') || /quota|rate limit/i.test(error.message))) {
         handleApiError(error, 'researchHeadlineIdea');
@@ -1207,5 +1262,186 @@ ${mainContent}
   } catch (error) {
     console.error('💥 Error in suggestExternalLinks:', error);
     handleApiError(error, 'suggestExternalLinks');
+  }
+}
+
+// Enhanced Multi-Source Search Functions
+
+export async function searchRedditTrends(query: string): Promise<Article[]> {
+  const aiClient = await initializeAI();
+  try {
+    const response = await aiClient.models.generateContent({
+      model: DEFAULT_TEXT_MODEL,
+      contents: `Search Reddit for trending discussions about "${query}". Find the top 3-5 most engaging posts or discussions related to this topic. Focus on recent, high-engagement content (upvotes, comments).
+
+For each Reddit post, format exactly like this:
+
+ARTICLE_START
+TITLE: [Post title or discussion topic]
+LINK: [Full Reddit URL to the post]
+SNIPPET: [Brief summary of the discussion, key points, or top comments]
+ARTICLE_END`,
+      config: {
+        tools: [{googleSearch: {}}],
+      },
+    });
+
+    const textResponse = response.text;
+    const articles: Article[] = [];
+    
+    if (textResponse) {
+      const articleBlockRegex = /ARTICLE_START([\s\S]*?)ARTICLE_END/g;
+      let blockMatch;
+      while ((blockMatch = articleBlockRegex.exec(textResponse)) !== null) {
+        const block = blockMatch[1];
+        const titleMatch = block.match(/TITLE:\s*([\s\S]*?)\s*LINK:/);
+        const linkMatch = block.match(/LINK:\s*([\s\S]*?)\s*SNIPPET:/);
+        const snippetMatch = block.match(/SNIPPET:\s*([\s\S]*)/);
+
+        const title = titleMatch?.[1]?.trim();
+        const link = linkMatch?.[1]?.trim();
+        const snippet = snippetMatch?.[1]?.trim();
+
+        if (title && link && snippet) {
+          articles.push({
+            title: `[Reddit] ${title}`,
+            link,
+            snippet,
+            source: 'Reddit'
+          });
+        }
+      }
+    }
+
+    return articles;
+  } catch (error) {
+    console.error('Error searching Reddit trends:', error);
+    return []; // Return empty array on error rather than throwing
+  }
+}
+
+export async function searchTwitterTrends(query: string): Promise<Article[]> {
+  const aiClient = await initializeAI();
+  try {
+    const response = await aiClient.models.generateContent({
+      model: DEFAULT_TEXT_MODEL,
+      contents: `Search for trending Twitter/X discussions about "${query}". Find recent viral tweets, thread discussions, or trending hashtags related to this topic. Focus on high-engagement content.
+
+For each trending item, format exactly like this:
+
+ARTICLE_START
+TITLE: [Tweet or discussion topic]
+LINK: [Twitter/X URL if available, or use hashtag/trend identifier]
+SNIPPET: [Summary of the trending discussion, key points, or viral content]
+ARTICLE_END`,
+      config: {
+        tools: [{googleSearch: {}}],
+      },
+    });
+
+    const textResponse = response.text;
+    const articles: Article[] = [];
+    
+    if (textResponse) {
+      const articleBlockRegex = /ARTICLE_START([\s\S]*?)ARTICLE_END/g;
+      let blockMatch;
+      while ((blockMatch = articleBlockRegex.exec(textResponse)) !== null) {
+        const block = blockMatch[1];
+        const titleMatch = block.match(/TITLE:\s*([\s\S]*?)\s*LINK:/);
+        const linkMatch = block.match(/LINK:\s*([\s\S]*?)\s*SNIPPET:/);
+        const snippetMatch = block.match(/SNIPPET:\s*([\s\S]*)/);
+
+        const title = titleMatch?.[1]?.trim();
+        const link = linkMatch?.[1]?.trim();
+        const snippet = snippetMatch?.[1]?.trim();
+
+        if (title && link && snippet) {
+          articles.push({
+            title: `[Twitter] ${title}`,
+            link,
+            snippet,
+            source: 'Twitter'
+          });
+        }
+      }
+    }
+
+    return articles;
+  } catch (error) {
+    console.error('Error searching Twitter trends:', error);
+    return []; // Return empty array on error rather than throwing
+  }
+}
+
+export async function analyzeCurrentTrends(query: string): Promise<{
+  trendScore: number;
+  trendDirection: 'rising' | 'declining' | 'stable';
+  keyInsights: string[];
+}> {
+  const aiClient = await initializeAI();
+  try {
+    const response = await aiClient.models.generateContent({
+      model: DEFAULT_TEXT_MODEL,
+      contents: `Analyze current trends for "${query}". Search for recent data about this topic's popularity, search trends, and social media engagement. 
+
+Provide analysis in this JSON format:
+{
+  "trendScore": number (0-100, where 100 is extremely trending),
+  "trendDirection": "rising" | "declining" | "stable",
+  "keyInsights": ["insight1", "insight2", "insight3"] (3-5 key trending insights)
+}`,
+      config: {
+        tools: [{googleSearch: {}}],
+      },
+    });
+
+    return parseJsonResponse(response.text, {
+      trendScore: 50,
+      trendDirection: 'stable' as const,
+      keyInsights: ['No trend data available']
+    });
+  } catch (error) {
+    console.error('Error analyzing trends:', error);
+    return {
+      trendScore: 50,
+      trendDirection: 'stable' as const,
+      keyInsights: ['Trend analysis unavailable']
+    };
+  }
+}
+
+export async function performEnhancedTopicSearch(query: string): Promise<{
+  articles: Article[];
+  groundingSources: GroundingSource[];
+  trendAnalysis: {
+    trendScore: number;
+    trendDirection: 'rising' | 'declining' | 'stable';
+    keyInsights: string[];
+  };
+  diverseSources: {
+    reddit: Article[];
+    twitter: Article[];
+  };
+}> {
+  try {
+    // Run all searches in parallel for better performance
+    const [newsResults, trendAnalysis, redditResults, twitterResults] = await Promise.all([
+      searchGoogleNews(query),
+      analyzeCurrentTrends(query),
+      searchRedditTrends(query),
+      searchTwitterTrends(query)
+    ]);
+
+    return {
+      articles: newsResults.articles,
+      groundingSources: newsResults.groundingSources,
+      trendAnalysis,
+      diverseSources: {
+        reddit: redditResults,
+        twitter: twitterResults
+      }
+    };
+  } catch (error) {
+    handleApiError(error, 'performEnhancedTopicSearch');
   }
 }

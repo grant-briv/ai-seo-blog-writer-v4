@@ -6,14 +6,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TextInput } from './TextInput';
 import { Button } from './Button';
 import { SectionCard } from './SectionCard';
-import { searchGoogleNews, deepResearchOnTopic, analyzeArticleViralPotential, generateTrendingQuestions, researchHeadlineIdea, RateLimitError } from '../services/geminiService';
-import type { Article, ArticleStats, GroundingSource } from '../types';
+import { searchGoogleNews, deepResearchOnTopic, analyzeArticleViralPotential, generateTrendingQuestions, researchHeadlineIdea, performEnhancedTopicSearch, RateLimitError } from '../services/geminiService';
+import type { Article, ArticleStats, GroundingSource, EnhancedSearchResult, TrendAnalysis } from '../types';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SaveIcon, SparklesIcon, SearchCircleIcon, TrendingUpIcon, LightBulbIcon } from './Icons';
 
 interface TopicFinderProps {
     onSetDeepResearchInfo: (info: string) => void;
     onHeadlineResearchComplete: (data: { researchInfo: string; headline: string; topic: string; }) => void;
+    selectedKeyword?: string;
 }
 
 const SAVED_SEARCHES_KEY = 'ai_blog_writer_topic_searches';
@@ -34,17 +35,18 @@ const getSentimentClasses = (sentiment: ArticleStats['sentiment']) => {
     }
 };
 
-export const TopicFinder: React.FC<TopicFinderProps> = ({ onSetDeepResearchInfo, onHeadlineResearchComplete }) => {
+export const TopicFinder: React.FC<TopicFinderProps> = ({ onSetDeepResearchInfo, onHeadlineResearchComplete, selectedKeyword }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isResearching, setIsResearching] = useState<string | null>(null); // Stores the link of the article being researched
     const [isAnalyzingStats, setIsAnalyzingStats] = useState<string | null>(null); // Stores link of article being analyzed for virality
     const [researchingHeadlineIndex, setResearchingHeadlineIndex] = useState<number | null>(null); // Stores headline index being researched
     const [error, setError] = useState<string | null>(null);
-    const [searchResults, setSearchResults] = useState<{ articles: Article[]; groundingSources: GroundingSource[] } | null>(null);
+    const [searchResults, setSearchResults] = useState<EnhancedSearchResult | null>(null);
     const [trendingQuestions, setTrendingQuestions] = useState<string[]>([]);
     const [editableHeadlines, setEditableHeadlines] = useState<string[]>([]);
     const [savedSearches, setSavedSearches] = useState<string[]>([]);
+    const [showAdvancedSources, setShowAdvancedSources] = useState<boolean>(false);
 
     useEffect(() => {
         try {
@@ -61,6 +63,13 @@ export const TopicFinder: React.FC<TopicFinderProps> = ({ onSetDeepResearchInfo,
         setEditableHeadlines(trendingQuestions);
     }, [trendingQuestions]);
 
+    // Populate search query when keyword is selected from Keyword Research tab
+    useEffect(() => {
+        if (selectedKeyword) {
+            setSearchQuery(selectedKeyword);
+        }
+    }, [selectedKeyword]);
+
     const handleSearch = useCallback(async (query: string) => {
         if (!query.trim()) return;
         setIsLoading(true);
@@ -68,11 +77,11 @@ export const TopicFinder: React.FC<TopicFinderProps> = ({ onSetDeepResearchInfo,
         setSearchResults(null);
         setTrendingQuestions([]);
         try {
-            const [newsResults, questionsResults] = await Promise.all([
-                searchGoogleNews(query),
+            const [enhancedResults, questionsResults] = await Promise.all([
+                performEnhancedTopicSearch(query),
                 generateTrendingQuestions(query)
             ]);
-            setSearchResults(newsResults);
+            setSearchResults(enhancedResults);
             setTrendingQuestions(questionsResults);
         } catch (err) {
             if (err instanceof RateLimitError) {
@@ -347,6 +356,107 @@ export const TopicFinder: React.FC<TopicFinderProps> = ({ onSetDeepResearchInfo,
                         </ul>
                     ) : (
                         <p className="text-center text-gray-500 py-6">No articles found for this topic.</p>
+                    )}
+
+                    {/* Trend Analysis Section */}
+                    {searchResults.trendAnalysis && (
+                        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                            <h3 className="text-lg font-semibold text-blue-900 mb-3 flex items-center">
+                                <TrendingUpIcon className="w-5 h-5 mr-2" />
+                                Trend Analysis
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="text-center">
+                                    <div className="text-2xl font-bold text-blue-700">
+                                        {searchResults.trendAnalysis.trendScore}/100
+                                    </div>
+                                    <div className="text-sm text-blue-600">Trend Score</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className={`text-lg font-semibold capitalize ${
+                                        searchResults.trendAnalysis.trendDirection === 'rising' ? 'text-green-600' :
+                                        searchResults.trendAnalysis.trendDirection === 'declining' ? 'text-red-600' :
+                                        'text-gray-600'
+                                    }`}>
+                                        {searchResults.trendAnalysis.trendDirection === 'rising' ? '📈' : 
+                                         searchResults.trendAnalysis.trendDirection === 'declining' ? '📉' : '➡️'} {searchResults.trendAnalysis.trendDirection}
+                                    </div>
+                                    <div className="text-sm text-blue-600">Direction</div>
+                                </div>
+                                <div className="md:col-span-1">
+                                    <div className="text-sm text-blue-600 font-medium mb-1">Key Insights:</div>
+                                    <ul className="text-xs text-blue-800 space-y-1">
+                                        {searchResults.trendAnalysis.keyInsights.slice(0, 2).map((insight, i) => (
+                                            <li key={i} className="truncate" title={insight}>• {insight}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Diverse Sources Toggle */}
+                    {(searchResults.diverseSources.reddit.length > 0 || searchResults.diverseSources.twitter.length > 0) && (
+                        <div className="mt-6">
+                            <Button
+                                onClick={() => setShowAdvancedSources(!showAdvancedSources)}
+                                variant="secondary"
+                                className="w-full flex items-center justify-center"
+                            >
+                                <SearchCircleIcon className="w-4 h-4 mr-2" />
+                                {showAdvancedSources ? 'Hide' : 'Show'} Social Media & Community Sources
+                                <span className="ml-2 text-xs bg-gray-200 px-2 py-1 rounded-full">
+                                    {searchResults.diverseSources.reddit.length + searchResults.diverseSources.twitter.length} sources
+                                </span>
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* Diverse Sources Content */}
+                    {showAdvancedSources && (
+                        <div className="mt-4 space-y-6">
+                            {/* Reddit Sources */}
+                            {searchResults.diverseSources.reddit.length > 0 && (
+                                <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                                    <h4 className="text-lg font-semibold text-orange-900 mb-3 flex items-center">
+                                        🔸 Reddit Discussions ({searchResults.diverseSources.reddit.length})
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {searchResults.diverseSources.reddit.slice(0, 3).map((article, index) => (
+                                            <div key={index} className="bg-white p-3 rounded border border-orange-100">
+                                                <h5 className="font-medium text-orange-800 text-sm">
+                                                    <a href={article.link} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                                        {article.title.replace('[Reddit] ', '')}
+                                                    </a>
+                                                </h5>
+                                                <p className="text-xs text-gray-600 mt-1">{article.snippet}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Twitter Sources */}
+                            {searchResults.diverseSources.twitter.length > 0 && (
+                                <div className="bg-sky-50 rounded-lg p-4 border border-sky-200">
+                                    <h4 className="text-lg font-semibold text-sky-900 mb-3 flex items-center">
+                                        🔹 Twitter/X Trends ({searchResults.diverseSources.twitter.length})
+                                    </h4>
+                                    <div className="space-y-3">
+                                        {searchResults.diverseSources.twitter.slice(0, 3).map((article, index) => (
+                                            <div key={index} className="bg-white p-3 rounded border border-sky-100">
+                                                <h5 className="font-medium text-sky-800 text-sm">
+                                                    <a href={article.link} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                                        {article.title.replace('[Twitter] ', '')}
+                                                    </a>
+                                                </h5>
+                                                <p className="text-xs text-gray-600 mt-1">{article.snippet}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )}
                     
                     {searchResults.groundingSources.length > 0 && (
