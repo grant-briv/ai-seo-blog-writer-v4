@@ -223,7 +223,7 @@ export class DatabaseService {
           const exists = existingProfiles.find(p => p.id === profile.id);
           if (!exists) {
             await this.createWriterProfile(profile);
-            console.log(`Migrated writer profile: ${profile.agentName}`);
+            console.log(`Migrated writer profile: "${profile.agentName}"`);
           }
         }
       }

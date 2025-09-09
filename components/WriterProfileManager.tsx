@@ -4,6 +4,7 @@ import type { AiWriterProfile, User } from '../types';
 import { Button } from './Button';
 import { AiWriterProfileForm } from './AiWriterProfileForm';
 import { PlusCircleIcon, TrashIcon, DocumentDuplicateIcon } from './Icons';
+import { DatabaseService } from '../services/databaseService';
 
 interface WriterProfileManagerProps {
     profiles: AiWriterProfile[];
@@ -42,11 +43,21 @@ export const WriterProfileManager: React.FC<WriterProfileManagerProps> = ({ prof
         setEditingProfile(null);
     };
     
-    const handleDeleteProfile = (profileId: string) => {
+    const handleDeleteProfile = async (profileId: string) => {
         if (window.confirm("Are you sure you want to delete this AI Writer Profile? This action cannot be undone.")) {
-          setProfiles(prev => prev.filter(p => p.id !== profileId));
-          if (typeof editingProfile !== 'string' && editingProfile?.id === profileId) {
-              setEditingProfile(null);
+          try {
+            // Actually delete from database first
+            const db = DatabaseService.getInstance();
+            await db.deleteWriterProfile(profileId);
+            
+            // Then remove from local state
+            setProfiles(prev => prev.filter(p => p.id !== profileId));
+            if (typeof editingProfile !== 'string' && editingProfile?.id === profileId) {
+                setEditingProfile(null);
+            }
+          } catch (error) {
+            console.error('Failed to delete profile:', error);
+            alert('Error: Could not delete profile. Please try again.');
           }
         }
     };

@@ -85,8 +85,26 @@ function buildPromptWithProfile(
   if (profileData?.brandVoice && (context === 'text' || context === 'social' || context === 'keywordAnalysis' || context === 'seo' || context === 'headline' || context === 'internalLinking' || context === 'externalLinking')) {
     fullPrompt += `\n\n**Brand Voice Guidelines:**\n${profileData.brandVoice}`;
   }
-  if (profileData?.knowledgeDocumentsText && (context === 'text' || context === 'keywordAnalysis' || context === 'seo')) { 
-    fullPrompt += `\n\n**Relevant Knowledge Base (Use this information to inform your response if relevant):**\n${profileData.knowledgeDocumentsText}`;
+  if (profileData && (context === 'text' || context === 'keywordAnalysis' || context === 'seo')) {
+    // Use legacy text field for knowledge base (maintain backward compatibility)
+    let knowledgeContent = profileData.knowledgeDocumentsText || '';
+    
+    // If we have enhanced knowledge documents, combine them
+    if (profileData.knowledgeDocuments && profileData.knowledgeDocuments.length > 0) {
+      const documentsContent = profileData.knowledgeDocuments
+        .map(doc => `--- ${doc.name} (${doc.type.toUpperCase()}) ---\n${doc.content}`)
+        .join('\n\n');
+      
+      if (knowledgeContent.trim()) {
+        knowledgeContent = knowledgeContent.trim() + '\n\n' + documentsContent;
+      } else {
+        knowledgeContent = documentsContent;
+      }
+    }
+    
+    if (knowledgeContent.trim()) {
+      fullPrompt += `\n\n**Relevant Knowledge Base (Use this information to inform your response if relevant):**\n${knowledgeContent}`;
+    }
   }
   
   fullPrompt += `\n\n---\n\n**User Request:**\n${userRequest}`;

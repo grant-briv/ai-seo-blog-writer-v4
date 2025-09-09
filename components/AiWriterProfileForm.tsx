@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { AiWriterProfile, GoogleSearchConfig, KeywordsEverywhereConfig } from '../types';
+import type { AiWriterProfile, GoogleSearchConfig, KeywordsEverywhereConfig, KnowledgeDocument } from '../types';
 import { TextInput } from './TextInput';
 import { TextAreaInput } from './TextAreaInput';
 import { Button } from './Button';
-import { PlusCircleIcon, SaveIcon, SparklesIcon, GlobeAltIcon } from './Icons';
+import { PlusCircleIcon, SaveIcon, SparklesIcon, GlobeAltIcon, BuildingLibraryIcon } from './Icons';
 import { 
   AVAILABLE_TEXT_MODELS, 
   KNOWLEDGE_BASE_MAX_CHARS, CHARS_PER_TOKEN_ESTIMATE, KNOWLEDGE_BASE_MAX_TOKENS_ESTIMATE, 
@@ -15,6 +15,8 @@ import { generateWebsiteContext, RateLimitError } from '../services/geminiServic
 import { SectionCard } from './SectionCard';
 import GoogleSearchConfigComponent from './GoogleSearchConfig';
 import KeywordsEverywhereConfigComponent from './KeywordsEverywhereConfig';
+import { KnowledgeBaseManager } from './KnowledgeBaseManager';
+import { DocumentProcessingService } from '../services/documentProcessingService';
 
 interface AiWriterProfileFormProps {
   profile?: AiWriterProfile | null; 
@@ -35,6 +37,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
   const [urlListInput, setUrlListInput] = useState('');
   const [sitemapPages, setSitemapPages] = useState<{ url: string; selected: boolean }[]>([]);
   const [websiteContext, setWebsiteContext] = useState('');
+  const [websiteBlogUrl, setWebsiteBlogUrl] = useState('');
   const [isGeneratingContext, setIsGeneratingContext] = useState(false);
 
   // Google Search Configuration state
@@ -45,6 +48,9 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
   
   // Profile visibility state
   const [isPublic, setIsPublic] = useState<boolean>(false);
+  
+  // Enhanced knowledge base state
+  const [knowledgeDocuments, setKnowledgeDocuments] = useState<KnowledgeDocument[]>([]);
   
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -58,8 +64,10 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       setImagePromptInstructions(profile.imagePromptInstructions || '');
       setSitemapPages(profile.sitemapPages || []);
       setWebsiteContext(profile.websiteContext || '');
+      setWebsiteBlogUrl(profile.websiteBlogUrl || '');
       setGoogleSearchConfig(profile.googleSearchConfig);
       setKeywordsEverywhereConfig(profile.keywordsEverywhereConfig);
+      setKnowledgeDocuments(profile.knowledgeDocuments || []);
       setIsPublic(profile.isPublic || false);
       setUrlListInput(''); // Clear input on profile change
     } else {
@@ -75,11 +83,13 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       setWebsiteContext('');
       setGoogleSearchConfig(undefined);
       setKeywordsEverywhereConfig(undefined);
+      setKnowledgeDocuments([]);
       setIsPublic(false);
     }
   }, [profile]);
 
-  const currentKnowledgeChars = knowledgeDocumentsText.length;
+  const totalKnowledgeContent = DocumentProcessingService.combineKnowledgeContent(knowledgeDocuments, knowledgeDocumentsText);
+  const currentKnowledgeChars = totalKnowledgeContent.length;
   const estimatedKnowledgeTokens = Math.ceil(currentKnowledgeChars / CHARS_PER_TOKEN_ESTIMATE);
   const knowledgeBaseOverLimit = estimatedKnowledgeTokens > KNOWLEDGE_BASE_MAX_TOKENS_ESTIMATE;
 
@@ -114,8 +124,10 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       imagePromptInstructions,
       sitemapPages,
       websiteContext,
+      websiteBlogUrl,
       googleSearchConfig,
       keywordsEverywhereConfig,
+      knowledgeDocuments,
       isPublic,
     });
     
@@ -131,6 +143,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
         setWebsiteContext('');
         setGoogleSearchConfig(undefined);
         setKeywordsEverywhereConfig(undefined);
+        setKnowledgeDocuments([]);
         setIsPublic(false);
     }
   };
@@ -229,22 +242,26 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
         placeholder="Define the AI's personality, role, expertise, and general writing style. E.g., 'You are a friendly financial advisor specializing in retirement planning for millennials...'"
         rows={8}
       />
-      <div>
-        <TextAreaInput
-          label="Knowledge Base (Paste Text Content)"
-          name="knowledgeDocumentsText"
-          value={knowledgeDocumentsText}
-          onChange={(e) => setKnowledgeDocumentsText(e.target.value)}
-          placeholder={`Paste relevant text content (up to ${KNOWLEDGE_BASE_MAX_CHARS.toLocaleString()} characters). The AI uses this text directly. Please copy and paste actual content, not just URLs.`}
-          rows={10}
-          className={knowledgeBaseOverLimit ? 'border-red-500 focus:ring-red-500' : ''}
-        />
-        <div className={`text-xs mt-1 ${knowledgeBaseOverLimit ? 'text-red-500' : 'text-gray-500'}`}>
-          Estimated Usage: {currentKnowledgeChars.toLocaleString()} / {KNOWLEDGE_BASE_MAX_CHARS.toLocaleString()} characters.
-          Approx. Tokens: {estimatedKnowledgeTokens.toLocaleString()} / {KNOWLEDGE_BASE_MAX_TOKENS_ESTIMATE.toLocaleString()} (est. {CHARS_PER_TOKEN_ESTIMATE} chars/token).
-          {knowledgeBaseOverLimit && <span className="font-semibold"> Limit exceeded.</span>}
+      <SectionCard title="Knowledge Base & Documents" icon={<BuildingLibraryIcon className="w-6 h-6 text-purple-600"/>} startOpen={true}>
+        <div className={knowledgeBaseOverLimit ? 'border-red-500 rounded-lg p-4 border-2' : ''}>
+          <KnowledgeBaseManager
+            documents={knowledgeDocuments}
+            legacyText={knowledgeDocumentsText}
+            profileId={profile?.id || 'new'}
+            onDocumentsChange={setKnowledgeDocuments}
+            onLegacyTextChange={setKnowledgeDocumentsText}
+          />
+          
+          <div className={`text-xs mt-4 p-3 rounded-lg ${knowledgeBaseOverLimit ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
+            <div className="font-semibold mb-1">Total Knowledge Base Usage:</div>
+            <div>Characters: {currentKnowledgeChars.toLocaleString()} / {KNOWLEDGE_BASE_MAX_CHARS.toLocaleString()}</div>
+            <div>Estimated Tokens: {estimatedKnowledgeTokens.toLocaleString()} / {KNOWLEDGE_BASE_MAX_TOKENS_ESTIMATE.toLocaleString()}</div>
+            {knowledgeBaseOverLimit && (
+              <div className="font-semibold mt-2">⚠️ Token limit exceeded! Please reduce content.</div>
+            )}
+          </div>
         </div>
-      </div>
+      </SectionCard>
       
       <TextAreaInput
         label="Brand Voice & Specific Guidelines"
@@ -340,6 +357,25 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
                   </div>
               )}
           </div>
+      </SectionCard>
+
+      <SectionCard title="Blog URL Configuration" icon={<GlobeAltIcon className="w-6 h-6 text-green-600"/>} startOpen={false}>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">Configure the base URL for your blog posts. This will be used to auto-populate the Blog Post Base URL field when generating content.</p>
+          
+          <TextInput
+            label="Website Blog URL"
+            name="websiteBlogUrl"
+            value={websiteBlogUrl}
+            onChange={(e) => setWebsiteBlogUrl(e.target.value)}
+            placeholder="e.g., https://yourdomain.com/blog/ or https://yourdomain.com/news/"
+            type="url"
+          />
+          
+          <p className="text-xs text-gray-500">
+            Examples: https://yourdomain.com/blog/, https://yourdomain.com/news/, https://yourdomain.com/
+          </p>
+        </div>
       </SectionCard>
 
       <SectionCard title="External Link Search Configuration" icon={<SparklesIcon className="w-6 h-6 text-sky-600"/>} startOpen={false}>

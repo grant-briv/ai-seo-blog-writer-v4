@@ -28,18 +28,35 @@ export interface SuggestedSeoElements {
   suggestedSlug: string;
 }
 
+export interface KnowledgeDocument {
+  id: string;
+  name: string;
+  type: 'text' | 'markdown' | 'pdf' | 'googledoc';
+  content: string;
+  originalUrl?: string; // For Google Docs
+  uploadDate: number;
+  size: number; // in characters
+  metadata?: {
+    title?: string;
+    author?: string;
+    pages?: number; // for PDFs
+  };
+}
+
 export interface AiWriterProfile {
   id: string;
   ownerId: string; // ID of the user who created/owns it
   agentName: string;
   coreInstructions: string;
-  knowledgeDocumentsText: string; // For pasted text or URLs
+  knowledgeDocumentsText: string; // Legacy field for backward compatibility
+  knowledgeDocuments?: KnowledgeDocument[]; // New enhanced knowledge base
   brandVoice: string;
   selectedModel?: string; // Added for model selection per profile
   selectedImageModel?: string; // Added for image model selection per profile
   imagePromptInstructions?: string; // For image generation guidelines
   sitemapPages?: { url: string; selected: boolean; }[];
   websiteContext?: string;
+  websiteBlogUrl?: string; // Base URL for blog posts (e.g., https://domain.com/blog/, https://domain.com/news/)
   googleSearchConfig?: GoogleSearchConfig; // Profile-specific search configuration
   keywordsEverywhereConfig?: KeywordsEverywhereConfig; // Profile-specific keyword research configuration
   isPublic?: boolean; // Whether the profile is public (shareable) or private
@@ -67,6 +84,7 @@ export interface WriterProfileData {
   selectedImageModel?: string; // Added for image model selection
   imagePromptInstructions?: string; // For image generation guidelines
   websiteContext?: string;
+  websiteBlogUrl?: string; // Base URL for blog posts (e.g., https://domain.com/blog/, https://domain.com/news/)
   googleSearchConfig?: GoogleSearchConfig; // Profile-specific search configuration
   keywordsEverywhereConfig?: KeywordsEverywhereConfig; // Profile-specific keyword research configuration
 }

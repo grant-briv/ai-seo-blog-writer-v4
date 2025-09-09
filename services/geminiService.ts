@@ -120,8 +120,26 @@ function buildPromptWithProfile(
   if (profileData?.brandVoice && (context === 'text' || context === 'social' || context === 'keywordAnalysis' || context === 'seo' || context === 'headline' || context === 'internalLinking' || context === 'externalLinking')) {
     fullPrompt += `\n\n**Brand Voice Guidelines:**\n${profileData.brandVoice}`;
   }
-  if (profileData?.knowledgeDocumentsText && (context === 'text' || context === 'keywordAnalysis' || context === 'seo')) { 
-    fullPrompt += `\n\n**Relevant Knowledge Base (Use this information to inform your response if relevant):**\n${profileData.knowledgeDocumentsText}`;
+  if (profileData && (context === 'text' || context === 'keywordAnalysis' || context === 'seo')) {
+    // Use legacy text field for knowledge base (maintain backward compatibility)
+    let knowledgeContent = profileData.knowledgeDocumentsText || '';
+    
+    // If we have enhanced knowledge documents, combine them
+    if (profileData.knowledgeDocuments && profileData.knowledgeDocuments.length > 0) {
+      const documentsContent = profileData.knowledgeDocuments
+        .map(doc => `--- ${doc.name} (${doc.type.toUpperCase()}) ---\n${doc.content}`)
+        .join('\n\n');
+      
+      if (knowledgeContent.trim()) {
+        knowledgeContent = knowledgeContent.trim() + '\n\n' + documentsContent;
+      } else {
+        knowledgeContent = documentsContent;
+      }
+    }
+    
+    if (knowledgeContent.trim()) {
+      fullPrompt += `\n\n**Relevant Knowledge Base (Use this information to inform your response if relevant):**\n${knowledgeContent}`;
+    }
   }
    if (profileData?.websiteContext && (context === 'text' || context === 'internalLinking')) {
     fullPrompt += `\n\n**INTERNAL LINKING CONTEXT (Available Website Pages for reference):**\n${profileData.websiteContext}`;
@@ -1495,5 +1513,78 @@ export async function performEnhancedTopicSearch(query: string): Promise<{
     };
   } catch (error) {
     handleApiError(error, 'performEnhancedTopicSearch');
+  }
+}
+
+/**
+ * Generate category and tag suggestions based on blog content and focus keywords
+ */
+export const generateCategoriesAndTags = async (
+  content: string,
+  focusKeywords: string,
+  profileData?: WriterProfileData
+): Promise<{ categories: string; tags: string }> => {
+  try {
+    console.log('🏷️ Starting generateCategoriesAndTags...');
+    const aiClient = await initializeAI();
+    const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
+    console.log('🏷️ Using model:', selectedModel);
+    
+    const brandVoiceContext = profileData?.brandVoice ? `Brand Voice Context: ${profileData.brandVoice}\n\n` : '';
+    const websiteContext = profileData?.websiteContext ? `Website Context: ${profileData.websiteContext}\n\n` : '';
+    
+    const prompt = `${brandVoiceContext}${websiteContext}Analyze the following blog content and focus keywords to suggest appropriate categories and tags:
+
+**Blog Content:**
+${content.slice(0, 2000)}...
+
+**Focus Keywords:**
+${focusKeywords}
+
+Please suggest:
+1. **Categories**: 2-4 broad, high-level categories that this content fits into (e.g., "Marketing, Technology, Business")
+2. **Tags**: 6-10 specific, relevant tags that describe the content in detail (e.g., "content marketing, SEO optimization, digital strategy, blog writing")
+
+Requirements:
+- Categories should be broad and suitable for website navigation
+- Tags should be specific and searchable
+- Use the same industry terminology as the website context
+- Consider the brand voice and target audience
+- Make suggestions that would help with SEO and content organization
+
+Format your response as:
+Categories: category1, category2, category3
+Tags: tag1, tag2, tag3, tag4, tag5, tag6, tag7, tag8`;
+
+    console.log('🏷️ Making API call...');
+    const response: GenerateContentResponse = await aiClient.models.generateContent({
+      model: selectedModel,
+      contents: prompt,
+      config: {
+        temperature: 0.7,
+        topP: 0.9,
+        topK: 40,
+        maxOutputTokens: 200,
+      }
+    });
+    
+    console.log('🏷️ API response received:', response);
+    const text = response.text;
+    console.log('🏷️ Response text:', text);
+
+    // Parse the response
+    const categoryMatch = text.match(/Categories:\s*([^\n]+)/i);
+    const tagMatch = text.match(/Tags:\s*([^\n]+)/i);
+    
+    const categories = categoryMatch ? categoryMatch[1].trim() : '';
+    const tags = tagMatch ? tagMatch[1].trim() : '';
+
+    return {
+      categories,
+      tags
+    };
+  } catch (error) {
+    handleApiError(error, 'generateCategoriesAndTags');
+    return { categories: '', tags: '' };
   }
 }

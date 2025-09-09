@@ -23,6 +23,7 @@ import {
   improveKeywordDensity,
   suggestInternalLinks,
   suggestExternalLinks,
+  generateCategoriesAndTags,
   RateLimitError, // Import the custom error
 } from './services/geminiService';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -285,6 +286,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
           ownerId: p.ownerId || 'admin-001',
           sitemapPages: p.sitemapPages || [],
           websiteContext: p.websiteContext || '',
+          websiteBlogUrl: p.websiteBlogUrl || '',
         }));
         setWriterProfiles(updatedProfiles);
         
@@ -349,6 +351,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
       selectedModel: activeWriterProfile.selectedModel || DEFAULT_TEXT_MODEL,
       imagePromptInstructions: activeWriterProfile.imagePromptInstructions,
       websiteContext: activeWriterProfile.websiteContext,
+      websiteBlogUrl: activeWriterProfile.websiteBlogUrl,
       googleSearchConfig: activeWriterProfile.googleSearchConfig,
       keywordsEverywhereConfig: activeWriterProfile.keywordsEverywhereConfig,
     };
@@ -455,9 +458,33 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
     }
   }, [mainContent, seoSettings.focusKeywords, approvalStatus, previousMainContentForApproval]);
 
+
+  // Helper function to generate category and tag suggestions
+  const generateCategoryTagSuggestions = useCallback(async (content: string, focusKeywords: string, profileData: WriterProfileData) => {
+    try {
+      console.log('🏷️ Calling generateCategoriesAndTags API...');
+      const suggestions = await generateCategoriesAndTags(content, focusKeywords, profileData);
+      console.log('🏷️ Received suggestions:', suggestions);
+      
+      setSeoSettings(prev => ({
+        ...prev,
+        categories: prev.categories?.trim() || suggestions.categories,
+        tags: prev.tags?.trim() || suggestions.tags
+      }));
+      console.log('🏷️ Updated SEO settings with suggestions');
+    } catch (error) {
+      console.error('❌ Error generating category/tag suggestions:', error);
+      // Fail silently - this is just a convenience feature
+    }
+  }, []);
+
   const handleGeneratePost = useCallback(async () => {
     if (!seoSettings.title || !seoSettings.focusKeywords) {
       setError("Please provide at least a Blog Post Title (H1) and Focus Keywords.");
+      return;
+    }
+    if (!selectedWriterProfileId || !activeWriterProfile) {
+      setError("Please select an Active AI Writer Profile before generating a blog post.");
       return;
     }
     if (seoSettings.minWordCount && seoSettings.maxWordCount && seoSettings.minWordCount > seoSettings.maxWordCount) {
@@ -477,6 +504,20 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
       const content = await generateBlogPost(seoSettings, blogInputs, profileData);
       setMainContent(content);
       setPreviousMainContentForApproval(content);
+      
+      // Auto-populate Blog Post Base URL from Profile
+      if (activeWriterProfile?.websiteBlogUrl && !seoSettings.blogPostUrl) {
+        setSeoSettings(prev => ({
+          ...prev,
+          blogPostUrl: activeWriterProfile.websiteBlogUrl
+        }));
+      }
+      
+      // Generate AI suggestions for categories and tags if not already filled
+      if (profileData && (!seoSettings.categories?.trim() || !seoSettings.tags?.trim())) {
+        console.log('🏷️ Generating categories and tags suggestions...');
+        generateCategoryTagSuggestions(content, seoSettings.focusKeywords, profileData);
+      }
     } catch (err) {
       if (err instanceof RateLimitError) {
         setError(err.message);
@@ -1368,7 +1409,28 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             <TextAreaInput label="Deep Research Info" name="researchInfo" value={blogInputs.researchInfo} onChange={handleBlogInputChange} placeholder="Paste notes, facts, data, URLs, or key insights..." rows={6} />
             <TextAreaInput label="Additional Instructions for AI (General)" name="userInstructions" value={blogInputs.userInstructions} onChange={handleBlogInputChange} placeholder="e.g., Write in a formal tone, target beginners, include a call to action for a newsletter." rows={3} />
             <div className="space-y-4">
-              <Button onClick={handleGeneratePost} disabled={anyLoading || !seoSettings.title || !seoSettings.focusKeywords} className="w-full text-white bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600">
+              {/* Show requirement message when button is disabled */}
+              {(anyLoading || !seoSettings.title || !seoSettings.focusKeywords || !selectedWriterProfileId) && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+                  <div className="flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span className="font-medium">
+                      {anyLoading ? "Generation in progress..." :
+                       !seoSettings.title ? "Please enter a Blog Post Title (H1) first" :
+                       !seoSettings.focusKeywords ? "Please enter Focus Keywords first" :
+                       !selectedWriterProfileId ? "Please select an Active AI Writer Profile first" : ""}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              <Button 
+                onClick={handleGeneratePost} 
+                disabled={anyLoading || !seoSettings.title || !seoSettings.focusKeywords || !selectedWriterProfileId} 
+                className="w-full text-white bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600"
+              >
                 <SparklesIcon className="w-5 h-5 mr-2"/> {isLoading ? 'Generating Post...' : 'Generate Draft Blog Post'}
               </Button>
             </div>
