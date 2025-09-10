@@ -70,15 +70,24 @@ export const hashPassword = async (password: string): Promise<string> => {
  * Verifies a password against its hash
  */
 export const verifyPassword = async (password: string, hash: string): Promise<boolean> => {
+  console.log('🔐 VERIFY: Starting password verification');
+  console.log('🔐 VERIFY: Password provided:', password ? 'YES' : 'NO');
+  console.log('🔐 VERIFY: Hash provided:', hash ? 'YES' : 'NO');
+  console.log('🔐 VERIFY: Hash length:', hash?.length);
+  console.log('🔐 VERIFY: Hash starts with $2:', hash?.startsWith('$2'));
+  
   if (!password || !hash) {
-    console.error('verifyPassword called with empty password or hash');
+    console.error('🔐 VERIFY: verifyPassword called with empty password or hash');
     return false;
   }
   
   try {
-    return await bcrypt.compare(password, hash);
+    console.log('🔐 VERIFY: Calling bcrypt.compare...');
+    const result = await bcrypt.compare(password, hash);
+    console.log('🔐 VERIFY: bcrypt.compare result:', result);
+    return result;
   } catch (error) {
-    console.error('Password verification failed:', error);
+    console.error('🔐 VERIFY: Password verification failed:', error);
     return false;
   }
 };
@@ -193,11 +202,14 @@ export const authenticateUser = async (username: string, password: string): Prom
   lockedUntil?: number 
 }> => {
   try {
+    console.log('🔐 AUTH: Starting authentication for user:', username);
+    
     // Check rate limiting
     const rateLimitCheck = isRateLimited(username);
     if (rateLimitCheck.isLimited) {
       const lockoutMinutes = rateLimitCheck.lockedUntil ? 
         Math.ceil((rateLimitCheck.lockedUntil - Date.now()) / (1000 * 60)) : 15;
+      console.log('🔐 AUTH: User is rate limited:', username, 'lockout minutes:', lockoutMinutes);
       return { 
         success: false, 
         error: `Too many failed attempts. Account locked for ${lockoutMinutes} minutes.`,
@@ -206,29 +218,44 @@ export const authenticateUser = async (username: string, password: string): Prom
     }
 
     // Get user from database
+    console.log('🔐 AUTH: Looking up user in database:', username.toLowerCase());
     const db = DatabaseService.getInstance();
     const user = await db.getUserByUsername(username.toLowerCase());
 
     if (!user) {
+      console.log('🔐 AUTH: User not found in database:', username);
       recordFailedAttempt(username);
       return { success: false, error: 'Invalid username or password' };
     }
 
+    console.log('🔐 AUTH: User found in database:', {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      hasPassword: !!user.password,
+      passwordLength: user.password?.length,
+      passwordStartsWith: user.password?.substring(0, 10) + '...'
+    });
+
     // Verify password
     if (!user.password) {
-      console.error(`User ${username} has no password set`);
+      console.error('🔐 AUTH: User has no password set:', username);
       recordFailedAttempt(username);
       return { success: false, error: 'Invalid username or password' };
     }
     
+    console.log('🔐 AUTH: Verifying password for user:', username);
     const isValidPassword = await verifyPassword(password, user.password);
+    console.log('🔐 AUTH: Password verification result:', isValidPassword);
     
     if (!isValidPassword) {
+      console.log('🔐 AUTH: Password verification failed for user:', username);
       recordFailedAttempt(username);
       return { success: false, error: 'Invalid username or password' };
     }
 
     // Success - clear failed attempts and create session
+    console.log('🔐 AUTH: Password verification successful, creating session for user:', username);
     clearFailedAttempts(username);
     const token = createSessionToken(user);
 
@@ -236,9 +263,10 @@ export const authenticateUser = async (username: string, password: string): Prom
     const userResponse = { ...user };
     delete (userResponse as any).password;
 
+    console.log('🔐 AUTH: Authentication successful for user:', username);
     return { success: true, user: userResponse, token };
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error('🔐 AUTH: Authentication error:', error);
     return { success: false, error: 'Authentication service unavailable' };
   }
 };
