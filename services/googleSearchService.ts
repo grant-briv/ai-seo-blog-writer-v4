@@ -82,6 +82,8 @@ export class GoogleSearchService {
     excludeDomains: string[] = [],
     blogContent?: string
   ): Promise<ExternalLinkSuggestion[]> {
+    // Track used anchor texts to avoid repetition
+    const usedAnchorTexts = new Set<string>();
     if (!this.isConfigured(config)) {
       throw new Error('Google Search API not configured');
     }
@@ -152,7 +154,7 @@ export class GoogleSearchService {
                 let context: string;
                 
                 if (blogContent) {
-                  const contentMatch = this.findBestContentMatch(blogContent, result, topic);
+                  const contentMatch = this.findBestContentMatch(blogContent, result, topic, usedAnchorTexts);
                   if (contentMatch) {
                     anchorText = contentMatch.anchorText;
                     context = contentMatch.context;
@@ -166,6 +168,9 @@ export class GoogleSearchService {
                   anchorText = this.extractAnchorText(result.title);
                   context = `According to research on ${topic.toLowerCase()}, ${result.snippet.substring(0, 100)}...`;
                 }
+                
+                // Track this anchor text to avoid repetition
+                usedAnchorTexts.add(anchorText.toLowerCase());
                 
                 console.log(`✅ Adding result: ${result.title} from ${result.displayLink}`);
                 console.log(`   Anchor text: "${anchorText}"`);
@@ -222,8 +227,19 @@ export class GoogleSearchService {
   private findBestContentMatch(
     blogContent: string, 
     searchResult: { title: string; snippet: string; displayLink: string }, 
-    topic: string
+    topic: string,
+    usedAnchorTexts: Set<string> = new Set()
   ): { anchorText: string; context: string } | null {
+    // Define semantic variations for common CRM/marketing terms
+    const semanticVariations: Record<string, string[]> = {
+      'crm': ['client management', 'customer relationship', 'lead tracking', 'contact management', 'client database'],
+      'real estate crm': ['client communication', 'lead distribution', 'property management system', 'agent tools', 'contact organization'],
+      'marketing': ['targeted campaigns', 'marketing automation', 'lead nurturing', 'client outreach', 'promotional strategies'],
+      'leads': ['prospect management', 'potential clients', 'buyer inquiries', 'lead generation', 'client acquisition'],
+      'automation': ['automated workflows', 'streamlined processes', 'efficiency tools', 'systematic approach', 'automated systems'],
+      'communication': ['client interaction', 'customer engagement', 'relationship building', 'follow-up systems', 'client touchpoints'],
+      'management': ['organizational tools', 'business systems', 'operational efficiency', 'workflow optimization', 'process management']
+    };
     // Remove heading tags (H1, H2, H3, H4) and their content first, then remove all other HTML tags
     const contentWithoutHeadings = blogContent.replace(/<h[1-4][^>]*>.*?<\/h[1-4]>/gi, ' ');
     const plainText = contentWithoutHeadings.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
@@ -289,9 +305,35 @@ export class GoogleSearchService {
       // Find the best anchor text for this sentence
       let bestAnchor = '';
       if (potentialAnchors.length > 0) {
-        // Prefer phrases that are more specific and relevant
-        bestAnchor = potentialAnchors.reduce((best, current) => {
+        // Filter out already used anchor texts and prefer diverse options
+        const unusedAnchors = potentialAnchors.filter(anchor => 
+          !usedAnchorTexts.has(anchor.toLowerCase())
+        );
+        
+        const anchorsToConsider = unusedAnchors.length > 0 ? unusedAnchors : potentialAnchors;
+        
+        // Prefer phrases that are more specific and diverse
+        bestAnchor = anchorsToConsider.reduce((best, current) => {
           if (!best) return current;
+          
+          // Check if current anchor uses semantic variations
+          const hasSemanticVariation = Object.values(semanticVariations)
+            .flat()
+            .some(variation => current.toLowerCase().includes(variation));
+          const bestHasSemanticVariation = Object.values(semanticVariations)
+            .flat()
+            .some(variation => best.toLowerCase().includes(variation));
+          
+          // Prefer semantic variations over exact keyword matches
+          if (hasSemanticVariation && !bestHasSemanticVariation) return current;
+          if (!hasSemanticVariation && bestHasSemanticVariation) return best;
+          
+          // Prefer unused anchor texts
+          const currentIsUsed = usedAnchorTexts.has(current.toLowerCase());
+          const bestIsUsed = usedAnchorTexts.has(best.toLowerCase());
+          
+          if (!currentIsUsed && bestIsUsed) return current;
+          if (currentIsUsed && !bestIsUsed) return best;
           
           // Prefer phrases with more relevant keywords
           const currentScore = relevantKeywords.reduce((acc, keyword) => 
@@ -307,18 +349,39 @@ export class GoogleSearchService {
       
       // If no good anchor found, try to extract a reasonable phrase from the sentence
       if (!bestAnchor && score > 0) {
-        // Look for noun phrases or key terms
-        const nounPhrases = sentence.match(/\b[A-Z][a-z]+(?:\s+[a-z]+){1,3}\b/g) || [];
-        if (nounPhrases.length > 0) {
-          bestAnchor = nounPhrases[0];
-        } else {
-          // Fall back to first few words that contain relevant terms
-          const words = sentence.split(/\s+/);
-          for (let i = 0; i < Math.min(words.length - 1, 6); i++) {
-            const phrase = words.slice(i, i + 3).join(' ');
-            if (relevantKeywords.some(keyword => phrase.toLowerCase().includes(keyword))) {
-              bestAnchor = phrase.replace(/[,.;:!?]$/, '');
+        // First try semantic variations
+        const words = sentence.split(/\s+/);
+        for (const [baseKeyword, variations] of Object.entries(semanticVariations)) {
+          for (const variation of variations) {
+            if (!usedAnchorTexts.has(variation.toLowerCase()) && 
+                sentence.toLowerCase().includes(variation)) {
+              bestAnchor = variation;
               break;
+            }
+          }
+          if (bestAnchor) break;
+        }
+        
+        // If still no anchor, look for noun phrases or key terms
+        if (!bestAnchor) {
+          const nounPhrases = sentence.match(/\b[A-Z][a-z]+(?:\s+[a-z]+){1,3}\b/g) || [];
+          const unusedNounPhrases = nounPhrases.filter(phrase => 
+            !usedAnchorTexts.has(phrase.toLowerCase())
+          );
+          
+          if (unusedNounPhrases.length > 0) {
+            bestAnchor = unusedNounPhrases[0];
+          } else if (nounPhrases.length > 0) {
+            bestAnchor = nounPhrases[0];
+          } else {
+            // Fall back to first few words that contain relevant terms
+            for (let i = 0; i < Math.min(words.length - 1, 6); i++) {
+              const phrase = words.slice(i, i + 3).join(' ');
+              if (relevantKeywords.some(keyword => phrase.toLowerCase().includes(keyword)) &&
+                  !usedAnchorTexts.has(phrase.toLowerCase())) {
+                bestAnchor = phrase.replace(/[,.;:!?]$/, '');
+                break;
+              }
             }
           }
         }

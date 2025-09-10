@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Persistent Profile Data</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        button { padding: 10px 20px; margin: 10px 0; background: #dc2626; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #b91c1c; }
+        .success { color: green; font-weight: bold; }
+        .warning { color: orange; font-weight: bold; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🗑️ Clear Persistent Profile Data</h1>
+    <p>This tool will help you remove the "Brivity (Copy)" profile that keeps coming back.</p>
+    
+    <button onclick="checkData()">1. Check Current Data</button>
+    <div id="checkResult"></div>
+    
+    <button onclick="clearProblematicProfiles()">2. Remove "Brivity (Copy)" Profile</button>
+    <div id="clearResult"></div>
+    
+    <button onclick="clearAllData()">3. 🚨 NUCLEAR OPTION: Clear All Data</button>
+    <div id="nuclearResult"></div>
+    
+    <p><strong>Instructions:</strong></p>
+    <ol>
+        <li>First click "Check Current Data" to see what's stored</li>
+        <li>Click "Remove Brivity (Copy) Profile" to target just that profile</li>
+        <li>Refresh your localhost:5173 page to see if it's gone</li>
+        <li>If it still comes back, use the "Nuclear Option" to clear everything</li>
+    </ol>
+    
+    <script>
+        function checkData() {
+            const result = document.getElementById('checkResult');
+            
+            try {
+                const profiles = JSON.parse(localStorage.getItem('aiWriterProfiles') || '[]');
+                const selectedId = localStorage.getItem('selectedAiWriterProfileId');
+                
+                result.innerHTML = `
+                    <div class="warning">Found ${profiles.length} profiles in localStorage:</div>
+                    <pre>${JSON.stringify(profiles.map(p => ({id: p.id, name: p.agentName})), null, 2)}</pre>
+                    <div>Selected Profile ID: ${selectedId || 'None'}</div>
+                `;
+                
+                const problematic = profiles.filter(p => p.agentName === 'Brivity (Copy)');
+                if (problematic.length > 0) {
+                    result.innerHTML += `<div class="warning">❌ Found ${problematic.length} "Brivity (Copy)" profile(s)</div>`;
+                } else {
+                    result.innerHTML += `<div class="success">✅ No "Brivity (Copy)" profiles found in localStorage</div>`;
+                }
+                
+            } catch (error) {
+                result.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+            }
+        }
+        
+        function clearProblematicProfiles() {
+            const result = document.getElementById('clearResult');
+            
+            try {
+                let profiles = JSON.parse(localStorage.getItem('aiWriterProfiles') || '[]');
+                const originalCount = profiles.length;
+                
+                // Remove "Brivity (Copy)" profiles
+                profiles = profiles.filter(p => p.agentName !== 'Brivity (Copy)');
+                
+                localStorage.setItem('aiWriterProfiles', JSON.stringify(profiles));
+                
+                const removed = originalCount - profiles.length;
+                result.innerHTML = `
+                    <div class="success">✅ Removed ${removed} "Brivity (Copy)" profile(s)</div>
+                    <div>Remaining profiles: ${profiles.length}</div>
+                    <div><strong>Next:</strong> Refresh localhost:5173 to see if the profile is gone</div>
+                `;
+                
+            } catch (error) {
+                result.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+            }
+        }
+        
+        function clearAllData() {
+            if (!confirm('⚠️ This will delete ALL your profiles, saved blogs, and settings. Are you sure?')) {
+                return;
+            }
+            
+            if (!confirm('🚨 FINAL WARNING: This cannot be undone. Continue?')) {
+                return;
+            }
+            
+            const result = document.getElementById('nuclearResult');
+            
+            try {
+                // Clear all AI writer related data
+                const keysToRemove = [
+                    'aiWriterProfiles',
+                    'selectedAiWriterProfileId', 
+                    'ai_blog_writer_saved_blogs',
+                    'keywordsEverywhereConfig',
+                    'users', // Auth data
+                    'currentUser'
+                ];
+                
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                    console.log(`Cleared: ${key}`);
+                });
+                
+                // Clear IndexedDB (if it exists)
+                if ('indexedDB' in window) {
+                    indexedDB.deleteDatabase('ai-seo-blog-writer');
+                }
+                
+                result.innerHTML = `
+                    <div class="success">✅ ALL DATA CLEARED</div>
+                    <div>Cleared localStorage keys: ${keysToRemove.join(', ')}</div>
+                    <div>Cleared IndexedDB database</div>
+                    <div><strong>Next:</strong> Refresh localhost:5173 - you'll need to login again</div>
+                `;
+                
+            } catch (error) {
+                result.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

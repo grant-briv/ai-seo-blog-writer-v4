@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fix User Authentication</title>
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+    <script src="https://unpkg.com/bcryptjs@latest/dist/bcrypt.min.js"></script>
+</head>
+<body>
+    <h1>Fix User Authentication</h1>
+    <div id="results"></div>
+    <div id="actions" style="margin-top: 20px;">
+        <button onclick="fixKasiaPassword()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; margin: 5px;">Fix Kasia's Password</button>
+        <button onclick="createKasiaUser()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; margin: 5px;">Create Kasia User (if missing)</button>
+        <button onclick="refreshCheck()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; margin: 5px;">Refresh Check</button>
+    </div>
+    
+    <script>
+        // Define the database structure same as the app
+        const db = new Dexie('AiSEOBlogWriterDB');
+        db.version(1).stores({
+            users: 'id, username, role',
+            writerProfiles: 'id, ownerId, agentName',
+            savedBlogPosts: 'id, userId, blogTitle, savedAt',
+            topicSearches: '++id, userId, searchQuery, createdAt',
+            appSettings: 'key'
+        });
+
+        // Security configuration (from authService.ts)
+        const SALT_ROUNDS = 12;
+
+        async function hashPassword(password) {
+            return await bcrypt.hash(password, SALT_ROUNDS);
+        }
+
+        async function checkDatabase() {
+            try {
+                await db.open();
+                console.log('Database opened successfully');
+                
+                // Check all users
+                const users = await db.users.toArray();
+                console.log('All users:', users);
+                
+                // Check for kasia specifically
+                const kasia = await db.users.where('username').equals('kasia').first();
+                console.log('Kasia user:', kasia);
+                
+                // Check for admin
+                const admin = await db.users.where('username').equals('admin').first();
+                console.log('Admin user:', admin);
+                
+                // Update the results div
+                document.getElementById('results').innerHTML = `
+                    <h2>Database Check Results:</h2>
+                    <p><strong>Total users:</strong> ${users.length}</p>
+                    <p><strong>Users found:</strong> ${users.map(u => u.username).join(', ')}</p>
+                    <p><strong>Kasia exists:</strong> ${kasia ? 'Yes' : 'No'}</p>
+                    <p><strong>Admin exists:</strong> ${admin ? 'Yes' : 'No'}</p>
+                    ${kasia ? `<p><strong>Kasia's password looks hashed:</strong> ${kasia.password.startsWith('$2') ? 'Yes' : 'No (needs fixing)'}</p>` : ''}
+                    <h3>User Details:</h3>
+                    <pre>${JSON.stringify(users.map(u => ({...u, password: u.password.substring(0, 20) + '...'})), null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                console.error('Database error:', error);
+                document.getElementById('results').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function fixKasiaPassword() {
+            try {
+                await db.open();
+                const kasia = await db.users.where('username').equals('kasia').first();
+                
+                if (!kasia) {
+                    alert('Kasia user not found! Use "Create Kasia User" instead.');
+                    return;
+                }
+
+                // Prompt for password
+                const password = prompt('Enter password for Kasia:');
+                if (!password) return;
+
+                // Hash the password
+                const hashedPassword = await hashPassword(password);
+                
+                // Update user
+                await db.users.put({
+                    ...kasia,
+                    password: hashedPassword
+                });
+
+                alert('Kasia\'s password has been fixed and hashed!');
+                await checkDatabase();
+                
+            } catch (error) {
+                alert('Error fixing password: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        async function createKasiaUser() {
+            try {
+                await db.open();
+                
+                // Check if kasia already exists
+                const existing = await db.users.where('username').equals('kasia').first();
+                if (existing) {
+                    alert('Kasia user already exists! Use "Fix Kasia\'s Password" instead.');
+                    return;
+                }
+
+                // Prompt for password
+                const password = prompt('Enter password for new Kasia user:');
+                if (!password) return;
+
+                // Hash the password
+                const hashedPassword = await hashPassword(password);
+                
+                // Create user
+                const newUser = {
+                    id: crypto.randomUUID(),
+                    username: 'kasia',
+                    password: hashedPassword,
+                    role: 'general',
+                    assignedProfileIds: []
+                };
+
+                await db.users.add(newUser);
+                
+                alert('Kasia user created successfully with hashed password!');
+                await checkDatabase();
+                
+            } catch (error) {
+                alert('Error creating user: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        async function refreshCheck() {
+            await checkDatabase();
+        }
+
+        // Run check when page loads
+        checkDatabase();
+    </script>
+</body>
+</html>

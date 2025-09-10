@@ -1,5 +1,6 @@
 import Dexie, { Table } from 'dexie';
 import { User, SavedBlogPost, AiWriterProfile } from '../types';
+import { PostgresDatabaseService } from './postgresDatabaseService';
 
 interface AppSetting {
   key: string;
@@ -37,10 +38,19 @@ class AppDatabase extends Dexie {
 export class DatabaseService {
   private static instance: DatabaseService;
   private db: AppDatabase;
+  private postgresDb: PostgresDatabaseService | null = null;
 
   private constructor() {
     this.db = new AppDatabase();
-    this.initializeDatabase();
+    
+    // Check if we're in production with PostgreSQL available
+    if (this.isProductionWithPostgres()) {
+      console.log('🗄️ Using PostgreSQL database for production');
+      this.postgresDb = PostgresDatabaseService.getInstance();
+    } else {
+      console.log('🗄️ Using IndexedDB for development');
+      this.initializeDatabase();
+    }
   }
 
   public static getInstance(): DatabaseService {
@@ -48,6 +58,15 @@ export class DatabaseService {
       DatabaseService.instance = new DatabaseService();
     }
     return DatabaseService.instance;
+  }
+
+  private isProductionWithPostgres(): boolean {
+    // Check if we have a DATABASE_URL environment variable (Railway provides this)
+    return !!(typeof window === 'undefined' || (process?.env?.DATABASE_URL || process?.env?.PGURL));
+  }
+
+  private getActiveDb() {
+    return this.postgresDb || this;
   }
 
   private async initializeDatabase(): Promise<void> {
@@ -77,18 +96,31 @@ export class DatabaseService {
 
   // User operations
   public async getAllUsers(): Promise<User[]> {
+    if (this.postgresDb) {
+      return await this.postgresDb.getAllUsers();
+    }
     return await this.db.users.orderBy('username').toArray();
   }
 
   public async getUserById(userId: string): Promise<User | undefined> {
+    if (this.postgresDb) {
+      return await this.postgresDb.getUserById(userId);
+    }
     return await this.db.users.get(userId);
   }
 
   public async getUserByUsername(username: string): Promise<User | undefined> {
+    if (this.postgresDb) {
+      return await this.postgresDb.getUserByUsername(username);
+    }
     return await this.db.users.where('username').equalsIgnoreCase(username).first();
   }
 
   public async createUser(user: User): Promise<void> {
+    if (this.postgresDb) {
+      return await this.postgresDb.createUser(user);
+    }
+    
     console.log('💾 DB: Creating user in database:', {
       id: user.id,
       username: user.username,
@@ -114,10 +146,16 @@ export class DatabaseService {
   }
 
   public async updateUser(user: User): Promise<void> {
+    if (this.postgresDb) {
+      return await this.postgresDb.updateUser(user);
+    }
     await this.db.users.put(user);
   }
 
   public async deleteUser(userId: string): Promise<void> {
+    if (this.postgresDb) {
+      return await this.postgresDb.deleteUser(userId);
+    }
     await this.db.users.delete(userId);
   }
 

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Kasia's Login Issue</title>
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+    <script src="https://unpkg.com/bcryptjs@latest/dist/bcrypt.min.js"></script>
+</head>
+<body>
+    <h1>Debug Kasia's Login Issue</h1>
+    <div id="results"></div>
+    <div style="margin-top: 20px;">
+        <button onclick="runFullDiagnostic()" style="padding: 15px 30px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px;">Run Full Diagnostic</button>
+        <button onclick="testBasicAuth()" style="padding: 15px 30px; background: #28a745; color: white; border: none; border-radius: 5px; margin-left: 10px;">Test Basic Auth</button>
+        <button onclick="forceCreateUser()" style="padding: 15px 30px; background: #ffc107; color: black; border: none; border-radius: 5px; margin-left: 10px;">Force Create Test User</button>
+    </div>
+    
+    <script>
+        const db = new Dexie('AiSEOBlogWriterDB');
+        db.version(1).stores({
+            users: 'id, username, role',
+            writerProfiles: 'id, ownerId, agentName',
+            savedBlogPosts: 'id, userId, blogTitle, savedAt',
+            topicSearches: '++id, userId, searchQuery, createdAt',
+            appSettings: 'key'
+        });
+
+        async function runFullDiagnostic() {
+            const results = [];
+            
+            try {
+                // Test 1: Browser compatibility
+                results.push(`<h3>🌐 Browser Info</h3>`);
+                results.push(`User Agent: ${navigator.userAgent}`);
+                results.push(`URL: ${window.location.href}`);
+                results.push(`Protocol: ${window.location.protocol}`);
+                results.push(`Host: ${window.location.host}`);
+                
+                // Test 2: IndexedDB support
+                results.push(`<h3>💾 Database Support</h3>`);
+                if (!window.indexedDB) {
+                    results.push(`❌ IndexedDB not supported`);
+                    return;
+                }
+                results.push(`✅ IndexedDB supported`);
+                
+                // Test 3: Dexie connection
+                await db.open();
+                results.push(`✅ Database connection successful`);
+                
+                // Test 4: Check users
+                const users = await db.users.toArray();
+                results.push(`<h3>👥 Users in Database (${users.length})</h3>`);
+                users.forEach(user => {
+                    results.push(`
+                        <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc;">
+                            <strong>${user.username}</strong> (${user.role})<br>
+                            ID: ${user.id}<br>
+                            Password: ${user.password ? '✅ Present (' + user.password.length + ' chars)' : '❌ Missing'}<br>
+                            Is Hashed: ${user.password && user.password.startsWith('$2') ? '✅ Yes' : '❌ No'}
+                        </div>
+                    `);
+                });
+                
+                // Test 5: Test bcrypt
+                results.push(`<h3>🔐 Crypto Support</h3>`);
+                try {
+                    const testHash = await bcrypt.hash('test123', 12);
+                    const testVerify = await bcrypt.compare('test123', testHash);
+                    results.push(`✅ bcrypt working - Hash: ${testHash.substring(0, 20)}..., Verify: ${testVerify}`);
+                } catch (e) {
+                    results.push(`❌ bcrypt failed: ${e.message}`);
+                }
+                
+                // Test 6: Test fetch to main app
+                results.push(`<h3>🌐 Network Test</h3>`);
+                try {
+                    const response = await fetch('/');
+                    results.push(`✅ Main app accessible: ${response.status} ${response.statusText}`);
+                } catch (e) {
+                    results.push(`❌ Cannot reach main app: ${e.message}`);
+                }
+                
+            } catch (error) {
+                results.push(`❌ Diagnostic failed: ${error.message}`);
+            }
+            
+            document.getElementById('results').innerHTML = results.join('<br>');
+        }
+
+        async function testBasicAuth() {
+            try {
+                const username = prompt('Enter username to test:') || 'kasia';
+                const password = prompt('Enter password to test:') || 'test123';
+                
+                console.log('Testing authentication for:', username);
+                
+                await db.open();
+                const user = await db.users.where('username').equals(username.toLowerCase()).first();
+                
+                if (!user) {
+                    alert(`❌ User "${username}" not found in database`);
+                    return;
+                }
+                
+                if (!user.password) {
+                    alert(`❌ User "${username}" has no password set`);
+                    return;
+                }
+                
+                console.log('Found user:', user.username, 'Password length:', user.password.length);
+                
+                const isValid = await bcrypt.compare(password, user.password);
+                
+                if (isValid) {
+                    alert(`✅ Authentication successful for ${username}!`);
+                } else {
+                    alert(`❌ Authentication failed for ${username} - wrong password`);
+                }
+                
+            } catch (error) {
+                alert(`❌ Test failed: ${error.message}`);
+                console.error(error);
+            }
+        }
+
+        async function forceCreateUser() {
+            try {
+                const username = prompt('Enter username:') || 'kasiatest';
+                const password = prompt('Enter password:') || 'KasiaPassword123!';
+                
+                await db.open();
+                
+                // Delete existing user
+                await db.users.where('username').equals(username.toLowerCase()).delete();
+                
+                // Create new user with proper hash
+                const hashedPassword = await bcrypt.hash(password, 12);
+                
+                const newUser = {
+                    id: crypto.randomUUID(),
+                    username: username.toLowerCase(),
+                    password: hashedPassword,
+                    role: 'general',
+                    assignedProfileIds: [],
+                    email: username + '@test.com'
+                };
+                
+                await db.users.add(newUser);
+                
+                // Verify it was saved
+                const saved = await db.users.where('username').equals(username.toLowerCase()).first();
+                
+                if (saved && saved.password) {
+                    alert(`✅ User "${username}" created successfully!\\nPassword: ${password}\\nTry logging in now.`);
+                } else {
+                    alert(`❌ User creation failed - not saved properly`);
+                }
+                
+            } catch (error) {
+                alert(`❌ User creation failed: ${error.message}`);
+                console.error(error);
+            }
+        }
+
+        // Auto-run diagnostic
+        window.onload = runFullDiagnostic;
+    </script>
+</body>
+</html>

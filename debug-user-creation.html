@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug User Creation Process</title>
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+    <script src="https://unpkg.com/bcryptjs@latest/dist/bcrypt.min.js"></script>
+</head>
+<body>
+    <h1>Debug User Creation Process</h1>
+    <div id="results"></div>
+    <div id="actions" style="margin-top: 20px;">
+        <button onclick="checkCurrentUsers()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; margin: 5px;">Check Current Users</button>
+        <button onclick="createTestUser()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; margin: 5px;">Create Test User (Properly)</button>
+        <button onclick="fixKasiaWest()" style="padding: 10px 20px; background: #ffc107; color: black; border: none; border-radius: 5px; margin: 5px;">Fix KasiaWest Password</button>
+        <button onclick="clearDatabase()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; margin: 5px;">Clear Non-Admin Users</button>
+    </div>
+    
+    <script>
+        // Define the database structure same as the app
+        const db = new Dexie('AiSEOBlogWriterDB');
+        db.version(1).stores({
+            users: 'id, username, role',
+            writerProfiles: 'id, ownerId, agentName',
+            savedBlogPosts: 'id, userId, blogTitle, savedAt',
+            topicSearches: '++id, userId, searchQuery, createdAt',
+            appSettings: 'key'
+        });
+
+        const SALT_ROUNDS = 12;
+
+        async function hashPassword(password) {
+            return await bcrypt.hash(password, SALT_ROUNDS);
+        }
+
+        async function checkCurrentUsers() {
+            try {
+                await db.open();
+                
+                const users = await db.users.toArray();
+                console.log('All users:', users);
+                
+                document.getElementById('results').innerHTML = `
+                    <h2>Current Users in Database:</h2>
+                    <div style="font-family: monospace; background: #f5f5f5; padding: 10px; margin: 10px 0;">
+                        Total users: ${users.length}
+                    </div>
+                    
+                    ${users.map(user => `
+                        <div style="border: 1px solid #ccc; margin: 10px 0; padding: 15px; background: #f9f9f9;">
+                            <h3>${user.username} (${user.role})</h3>
+                            <div><strong>ID:</strong> ${user.id}</div>
+                            <div><strong>Email:</strong> ${user.email || 'None'}</div>
+                            <div><strong>Password exists:</strong> ${user.password ? 'Yes' : 'NO - THIS IS THE PROBLEM!'}</div>
+                            <div><strong>Password type:</strong> ${typeof user.password}</div>
+                            ${user.password ? `
+                                <div><strong>Password length:</strong> ${user.password.length}</div>
+                                <div><strong>Is hashed:</strong> ${user.password.startsWith('$2') ? 'Yes' : 'No'}</div>
+                                <div><strong>Password preview:</strong> ${user.password.substring(0, 30)}...</div>
+                            ` : `
+                                <div style="color: red; font-weight: bold;">❌ NO PASSWORD SET - USER CANNOT LOGIN</div>
+                            `}
+                        </div>
+                    `).join('')}
+                `;
+                
+            } catch (error) {
+                console.error('Database error:', error);
+                document.getElementById('results').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function createTestUser() {
+            try {
+                await db.open();
+                
+                const username = prompt('Enter username for test user:') || 'testuser';
+                const password = prompt('Enter password for test user:') || 'TestPassword123!';
+                
+                // Check if user exists
+                const existing = await db.users.where('username').equals(username).first();
+                if (existing) {
+                    alert('User already exists!');
+                    return;
+                }
+
+                // Hash the password properly
+                const hashedPassword = await hashPassword(password);
+                
+                // Create user with proper structure
+                const newUser = {
+                    id: crypto.randomUUID(),
+                    username: username,
+                    password: hashedPassword,
+                    role: 'general',
+                    assignedProfileIds: [],
+                    email: username + '@example.com'
+                };
+
+                console.log('Creating user:', { ...newUser, password: 'HASHED' });
+                
+                await db.users.add(newUser);
+                
+                alert(`User ${username} created successfully with hashed password!\\nPassword: ${password}`);
+                await checkCurrentUsers();
+                
+            } catch (error) {
+                alert('Error creating user: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        async function fixKasiaWest() {
+            try {
+                await db.open();
+                const user = await db.users.where('username').equals('kasiawest').first();
+                
+                if (!user) {
+                    alert('KasiaWest user not found!');
+                    return;
+                }
+
+                console.log('KasiaWest before fix:', user);
+
+                const password = prompt('Enter password for KasiaWest:') || 'KasiaPassword123!';
+                const hashedPassword = await hashPassword(password);
+                
+                await db.users.put({
+                    ...user,
+                    password: hashedPassword
+                });
+
+                console.log('KasiaWest fixed');
+                alert(`KasiaWest password fixed!\\nPassword: ${password}`);
+                await checkCurrentUsers();
+                
+            } catch (error) {
+                alert('Error fixing KasiaWest: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        async function clearDatabase() {
+            if (!confirm('This will delete all non-admin users. Are you sure?')) {
+                return;
+            }
+            
+            try {
+                await db.open();
+                
+                // Delete all non-admin users
+                await db.users.where('role').notEqual('admin').delete();
+                
+                alert('All non-admin users deleted');
+                await checkCurrentUsers();
+                
+            } catch (error) {
+                alert('Error clearing database: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        // Run check when page loads
+        checkCurrentUsers();
+    </script>
+</body>
+</html>

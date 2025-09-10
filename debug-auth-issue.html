@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Authentication Issue</title>
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+</head>
+<body>
+    <h1>Debug Authentication Issue</h1>
+    <div id="results"></div>
+    <div id="actions" style="margin-top: 20px;">
+        <button onclick="checkUsers()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; margin: 5px;">Check All Users</button>
+        <button onclick="fixKasia()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; margin: 5px;">Fix Kasia</button>
+        <button onclick="testAuth()" style="padding: 10px 20px; background: #ffc107; color: black; border: none; border-radius: 5px; margin: 5px;">Test Auth</button>
+    </div>
+    
+    <script>
+        // Define the database structure same as the app
+        const db = new Dexie('AiSEOBlogWriterDB');
+        db.version(1).stores({
+            users: 'id, username, role',
+            writerProfiles: 'id, ownerId, agentName',
+            savedBlogPosts: 'id, userId, blogTitle, savedAt',
+            topicSearches: '++id, userId, searchQuery, createdAt',
+            appSettings: 'key'
+        });
+
+        async function checkUsers() {
+            try {
+                await db.open();
+                
+                // Check all users
+                const users = await db.users.toArray();
+                console.log('All users:', users);
+                
+                document.getElementById('results').innerHTML = `
+                    <h2>All Users in Database:</h2>
+                    <pre>${JSON.stringify(users, null, 2)}</pre>
+                    
+                    <h3>Analysis:</h3>
+                    ${users.map(user => `
+                        <div style="border: 1px solid #ccc; margin: 10px; padding: 10px;">
+                            <strong>Username:</strong> ${user.username}<br>
+                            <strong>Password exists:</strong> ${user.password ? 'Yes' : 'No'}<br>
+                            <strong>Password length:</strong> ${user.password ? user.password.length : 'N/A'}<br>
+                            <strong>Password type:</strong> ${typeof user.password}<br>
+                            <strong>Is hashed:</strong> ${user.password && user.password.startsWith('$2') ? 'Yes' : 'No'}<br>
+                            <strong>Password preview:</strong> ${user.password ? user.password.substring(0, 20) + '...' : 'None'}
+                        </div>
+                    `).join('')}
+                `;
+                
+            } catch (error) {
+                console.error('Database error:', error);
+                document.getElementById('results').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function fixKasia() {
+            try {
+                await db.open();
+                const kasia = await db.users.where('username').equals('kasia').first();
+                
+                if (!kasia) {
+                    alert('Kasia user not found!');
+                    return;
+                }
+
+                console.log('Kasia before fix:', kasia);
+
+                // Set a proper hashed password for testing
+                const testHashedPassword = '$2b$12$VYyK8MvNqLq1K8L.3rV4t.K8j1yJZzXYGjQ8L1Vj5Q8K7w6t5r4e2';
+                
+                await db.users.put({
+                    ...kasia,
+                    password: testHashedPassword
+                });
+
+                console.log('Kasia fixed with test password');
+                alert('Kasia fixed with test hashed password. Try logging in with any password to test the hash comparison.');
+                await checkUsers();
+                
+            } catch (error) {
+                alert('Error fixing Kasia: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        async function testAuth() {
+            try {
+                // Test the authentication logic manually
+                const username = 'kasia';
+                const password = 'Password4kasia*';
+                
+                const user = await db.users.where('username').equals(username.toLowerCase()).first();
+                console.log('Found user:', user);
+                
+                if (!user) {
+                    alert('User not found');
+                    return;
+                }
+                
+                if (!user.password) {
+                    alert('User password is null/undefined!');
+                    return;
+                }
+                
+                console.log('User password type:', typeof user.password);
+                console.log('User password length:', user.password.length);
+                console.log('User password starts with $2:', user.password.startsWith('$2'));
+                
+                alert(`User found: ${user.username}, Password exists: ${!!user.password}, Password type: ${typeof user.password}`);
+                
+            } catch (error) {
+                alert('Test error: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        // Run check when page loads
+        checkUsers();
+    </script>
+</body>
+</html>

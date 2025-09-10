@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reset Admin Password</title>
+</head>
+<body>
+    <h1>Reset Local Admin Password</h1>
+    <button onclick="resetAdmin()">Reset Admin to Default</button>
+    <div id="result"></div>
+    
+    <script>
+        function resetAdmin() {
+            try {
+                // Clear all localStorage
+                localStorage.clear();
+                
+                // Set up default admin user
+                const defaultAdmin = {
+                    id: 'admin-001',
+                    username: 'admin',
+                    password: '$2b$12$defaulthash', // This will be reset by migration
+                    role: 'admin',
+                    createdAt: Date.now(),
+                    lastLoginAt: null,
+                    failedLoginAttempts: 0,
+                    isLocked: false
+                };
+                
+                const users = [defaultAdmin];
+                localStorage.setItem('users', JSON.stringify(users));
+                
+                document.getElementById('result').innerHTML = `
+                    <p style="color: green;">✅ Admin reset successfully!</p>
+                    <p><strong>Username:</strong> admin</p>
+                    <p><strong>Password:</strong> SecureAdmin123!</p>
+                    <p>Now go back to <a href="http://localhost:5173">localhost:5173</a></p>
+                `;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `
+                    <p style="color: red;">❌ Error: ${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

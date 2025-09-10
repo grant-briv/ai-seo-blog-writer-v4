@@ -716,6 +716,11 @@ Provide a detailed analysis following this structure:
 ## Executive Summary
 [2-3 sentence summary of the main points]
 
+## Search Intent Analysis
+[Primary intent: Informational/Navigational/Commercial/Transactional]
+[Top user questions identified from search data]
+[Related search queries people are making]
+
 ## Key Findings
 [Bullet points of the most important discoveries, facts, or conclusions]
 
@@ -724,6 +729,11 @@ Provide a detailed analysis following this structure:
 
 ## Expert Opinions & Quotes
 [Notable quotes from experts, officials, or key stakeholders]
+
+## Common Questions & Topics
+[Questions from "People Also Ask" sections]
+[Forum/community questions found on this topic]
+[Question-based search queries related to the topic]
 
 ## Implications & Impact
 [What this means for the industry/topic, potential consequences]
