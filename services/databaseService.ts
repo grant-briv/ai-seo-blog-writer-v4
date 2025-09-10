@@ -43,14 +43,13 @@ export class DatabaseService {
   private constructor() {
     this.db = new AppDatabase();
     
-    // Check if we're in production with PostgreSQL available
-    if (this.isProductionWithPostgres()) {
-      console.log('🗄️ Using PostgreSQL database for production');
-      this.postgresDb = PostgresDatabaseService.getInstance();
-    } else {
-      console.log('🗄️ Using IndexedDB for development');
-      this.initializeDatabase();
-    }
+    // For now, always use IndexedDB since this is a client-side app
+    // PostgreSQL integration can be added later via API endpoints
+    console.log('🗄️ Using IndexedDB for client-side storage');
+    this.initializeDatabase();
+    
+    // PostgreSQL support is prepared but not active in client-side app
+    this.postgresDb = null;
   }
 
   public static getInstance(): DatabaseService {
@@ -61,9 +60,19 @@ export class DatabaseService {
   }
 
   private isProductionWithPostgres(): boolean {
-    // Check if we have a DATABASE_URL environment variable (Railway provides this)
-    // Only use PostgreSQL on server-side (when window is undefined) and DATABASE_URL exists
-    return typeof window === 'undefined' && !!(process?.env?.DATABASE_URL || process?.env?.PGURL);
+    // Only check for PostgreSQL on server-side (when window is undefined)
+    if (typeof window !== 'undefined') {
+      // Client-side: always use IndexedDB
+      return false;
+    }
+    
+    // Server-side: check for DATABASE_URL environment variable
+    try {
+      return !!(process?.env?.DATABASE_URL || process?.env?.PGURL);
+    } catch (e) {
+      // If process is not available, fallback to IndexedDB
+      return false;
+    }
   }
 
   private getActiveDb() {
