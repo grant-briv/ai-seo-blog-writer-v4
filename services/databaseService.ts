@@ -89,7 +89,28 @@ export class DatabaseService {
   }
 
   public async createUser(user: User): Promise<void> {
-    await this.db.users.add(user);
+    console.log('💾 DB: Creating user in database:', {
+      id: user.id,
+      username: user.username,
+      hasPassword: !!user.password,
+      passwordLength: user.password?.length
+    });
+    
+    try {
+      await this.db.users.add(user);
+      console.log('💾 DB: User creation successful');
+      
+      // Verify the user was actually saved
+      const savedUser = await this.db.users.get(user.id);
+      console.log('💾 DB: Verification - user saved:', {
+        found: !!savedUser,
+        hasPassword: !!savedUser?.password,
+        passwordLength: savedUser?.password?.length
+      });
+    } catch (error) {
+      console.error('💾 DB: User creation failed:', error);
+      throw error;
+    }
   }
 
   public async updateUser(user: User): Promise<void> {
