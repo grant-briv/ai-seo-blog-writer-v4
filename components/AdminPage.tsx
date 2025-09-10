@@ -3,13 +3,15 @@ import type { AiWriterProfile, User } from '../types';
 import { Button } from './Button';
 import { SectionCard } from './SectionCard';
 import { ArrowLeftIcon, PlusCircleIcon, TrashIcon, UserGroupIcon, SaveIcon } from './Icons';
-import { getUsers, saveUsers } from '../services/userService';
+import { getUsers } from '../services/userService';
+import { createSecureUser, updateUserPassword, validatePasswordStrength } from '../services/authService';
 import { TextInput } from './TextInput';
 import { ApiKeyManager } from './ApiKeyManager';
 import { PasswordManager } from './PasswordManager';
 import EmailConfigComponent from './EmailConfig';
 import { emailService } from '../services/emailService';
 import type { EmailConfig } from '../services/emailService';
+import { DatabaseService } from '../services/databaseService';
 
 interface AdminPageProps {
   profiles: AiWriterProfile[];
@@ -36,25 +38,31 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
   }, []);
   const [editingUser, setEditingUser] = useState<User | null | 'new'>(null);
 
-  const handleSaveUser = (userToSave: User) => {
-    let updatedUsers;
-    const existingIndex = users.findIndex(u => u.id === userToSave.id);
+  const handleSaveUser = async (userToSave: User) => {
+    try {
+      const db = DatabaseService.getInstance();
+      const existingIndex = users.findIndex(u => u.id === userToSave.id);
+      let updatedUsers;
 
-    if (existingIndex > -1) {
-      updatedUsers = [...users];
-      updatedUsers[existingIndex] = userToSave;
-    } else {
-      updatedUsers = [...users, userToSave];
+      if (existingIndex > -1) {
+        // Update existing user
+        await db.updateUser(userToSave);
+        updatedUsers = [...users];
+        updatedUsers[existingIndex] = userToSave;
+      } else {
+        // Create new user - this should never happen as we handle creation in UserForm
+        updatedUsers = [...users, userToSave];
+      }
+      
+      setUsers(updatedUsers);
+      setEditingUser(null);
+    } catch (error) {
+      console.error('Failed to save user:', error);
+      alert('Failed to save user. Please try again.');
     }
-    
-    setUsers(updatedUsers);
-
-    
-    saveUsers(updatedUsers);  // Note: saveUsers is async but we don't await here for simplicity
-    setEditingUser(null);
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     const userToDelete = users.find(u => u.id === userId);
     if (!userToDelete) return;
     
@@ -63,12 +71,18 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
       return;
     }
     if (window.confirm(`Are you sure you want to delete the user "${userToDelete.username}"? This action cannot be undone.`)) {
-      const updatedUsers = users.filter(u => u.id !== userId);
-      setUsers(updatedUsers);
+      try {
+        const db = DatabaseService.getInstance();
+        await db.deleteUser(userId);
+        const updatedUsers = users.filter(u => u.id !== userId);
+        setUsers(updatedUsers);
 
-      saveUsers(updatedUsers);  // Note: saveUsers is async but we don't await here for simplicity
-      if (typeof editingUser !== 'string' && editingUser?.id === userId) {
-        setEditingUser(null);
+        if (typeof editingUser !== 'string' && editingUser?.id === userId) {
+          setEditingUser(null);
+        }
+      } catch (error) {
+        console.error('Failed to delete user:', error);
+        alert('Failed to delete user. Please try again.');
       }
     }
   };
@@ -113,39 +127,169 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
       }
 
       try {
-        let finalPassword = password;
-        
-        // If sending invite, generate temporary password
-        if (shouldSendInvite && emailService.isConfigured()) {
-          finalPassword = emailService.generateTempPassword();
-        }
-
-        const updatedUser: User = {
-          id: user?.id || crypto.randomUUID(),
-          username: username.trim(),
-          email: email.trim() || undefined,
-          password: finalPassword || (user?.password || 'changeme123'),
-          role,
-          assignedProfileIds: role === 'admin' ? [] : assignedProfileIds,
-          isTemporaryPassword: shouldSendInvite
-        };
-        
-        // Send invitation email if requested
-        if (shouldSendInvite && email.trim() && emailService.isConfigured()) {
-          const inviteResult = await emailService.sendInvitationEmail({
-            userEmail: email.trim(),
-            inviterName: 'Admin',
-            tempPassword: finalPassword,
-            loginUrl: window.location.origin,
-            companyName: 'AI SEO Blog Writer'
+        if (user) {
+          // Updating existing user
+          if (password) {
+            // Password change for existing user
+            const passwordValidation = validatePasswordStrength(password);
+            if (!passwordValidation.isValid) {
+              setError(passwordValidation.errors.join('; '));
+              setIsLoading(false);
+              return;
+            }
+            
+            // For existing user password updates, we'd need current password verification
+            // For now, admin can reset any user password
+            const db = DatabaseService.getInstance();
+            const { hashPassword } = await import('../services/authService');
+            const hashedPassword = await hashPassword(password);
+            
+            const updatedUser: User = {
+              ...user,
+              username: username.trim(),
+              email: email.trim() || undefined,
+              password: hashedPassword,
+              role,
+              assignedProfileIds: role === 'admin' ? [] : assignedProfileIds
+            };
+            
+            await db.updateUser(updatedUser);
+            
+            // Update local state
+            const updatedUsers = users.map(u => u.id === user.id ? updatedUser : u);
+            setUsers(updatedUsers);
+          } else {
+            // Update user without password change
+            const updatedUser: User = {
+              ...user,
+              username: username.trim(),
+              email: email.trim() || undefined,
+              role,
+              assignedProfileIds: role === 'admin' ? [] : assignedProfileIds
+            };
+            
+            const db = DatabaseService.getInstance();
+            await db.updateUser(updatedUser);
+            
+            // Update local state
+            const updatedUsers = users.map(u => u.id === user.id ? updatedUser : u);
+            setUsers(updatedUsers);
+          }
+        } else {
+          // Creating new user - use secure creation
+          console.log('🔧 DEBUG: Starting user creation process');
+          console.log('🔧 DEBUG: Input values:', {
+            username: username.trim(),
+            email: email.trim(),
+            password: password ? '***PROVIDED***' : 'NOT PROVIDED',
+            role,
+            shouldSendInvite,
+            assignedProfileIds
           });
           
-          if (!inviteResult.success) {
-            setError(`User created but invitation failed: ${inviteResult.message}`);
+          let finalPassword = password;
+          
+          // If sending invite, generate temporary password
+          if (shouldSendInvite && emailService.isConfigured()) {
+            finalPassword = emailService.generateTempPassword();
+            console.log('🔧 DEBUG: Generated temp password for invitation');
+          }
+          
+          if (!finalPassword) {
+            finalPassword = 'TempPassword123!'; // Fallback secure password
+            console.log('🔧 DEBUG: Using fallback password');
+          }
+          
+          console.log('🔧 DEBUG: Final password set:', finalPassword ? 'YES' : 'NO');
+          
+          // Use secure user creation
+          console.log('🔧 DEBUG: Calling createSecureUser with:', {
+            username: username.trim(),
+            password: '***HIDDEN***',
+            role,
+            assignedProfileIds: role === 'admin' ? [] : assignedProfileIds
+          });
+          
+          const createResult = await createSecureUser({
+            username: username.trim(),
+            password: finalPassword,
+            role,
+            assignedProfileIds: role === 'admin' ? [] : assignedProfileIds
+          });
+          
+          console.log('🔧 DEBUG: createSecureUser result:', {
+            success: createResult.success,
+            error: createResult.error,
+            userCreated: !!createResult.user,
+            userId: createResult.user?.id
+          });
+          
+          if (!createResult.success) {
+            console.error('🔧 DEBUG: createSecureUser failed:', createResult.error);
+            setError(createResult.error || 'Failed to create user');
+            setIsLoading(false);
+            return;
+          }
+          
+          console.log('🔧 DEBUG: User created successfully, now handling email and local state');
+          
+          // Add email if provided - MUST get fresh user from DB to preserve password
+          if (email.trim() && createResult.user) {
+            console.log('🔧 DEBUG: Adding email to user');
+            const db = DatabaseService.getInstance();
+            
+            // Get the full user with password from database
+            const fullUser = await db.getUserById(createResult.user.id);
+            if (!fullUser) {
+              console.error('🔧 DEBUG: Could not retrieve full user from database');
+              setError('Failed to update user with email');
+              setIsLoading(false);
+              return;
+            }
+            
+            console.log('🔧 DEBUG: Retrieved full user from DB, password present:', !!fullUser.password);
+            
+            // Update with email while preserving all other data including password
+            const userWithEmail = { 
+              ...fullUser, 
+              email: email.trim(), 
+              isTemporaryPassword: shouldSendInvite 
+            };
+            
+            await db.updateUser(userWithEmail);
+            console.log('🔧 DEBUG: Updated user with email in database (password preserved)');
+            
+            // Update local state (remove password for security)
+            const userForState = { ...userWithEmail };
+            delete (userForState as any).password;
+            setUsers([...users, userForState]);
+            console.log('🔧 DEBUG: Updated local state with user (with email, password removed for display)');
+          } else if (createResult.user) {
+            console.log('🔧 DEBUG: Adding user without email');
+            const userForState = { ...createResult.user, isTemporaryPassword: shouldSendInvite };
+            setUsers([...users, userForState]);
+            console.log('🔧 DEBUG: Updated local state with user (no email)');
+          } else {
+            console.error('🔧 DEBUG: createResult.user is null/undefined!');
+          }
+          
+          // Send invitation email if requested
+          if (shouldSendInvite && email.trim() && emailService.isConfigured()) {
+            const inviteResult = await emailService.sendInvitationEmail({
+              userEmail: email.trim(),
+              inviterName: 'Admin',
+              tempPassword: finalPassword,
+              loginUrl: window.location.origin,
+              companyName: 'AI SEO Blog Writer'
+            });
+            
+            if (!inviteResult.success) {
+              setError(`User created but invitation failed: ${inviteResult.message}`);
+            }
           }
         }
         
-        onSave(updatedUser);
+        setEditingUser(null);
       } catch (error) {
         setError(error instanceof Error ? error.message : 'An error occurred');
       } finally {

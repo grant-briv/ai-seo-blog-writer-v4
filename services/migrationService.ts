@@ -13,6 +13,24 @@ export const migrateUsersToHashedPasswords = async (): Promise<void> => {
     console.log(`Found ${users.length} users to potentially migrate`);
     
     for (const user of users) {
+      // Check if user has a password
+      if (!user.password) {
+        console.log(`User ${user.username} has no password - setting secure default`);
+        
+        // Set a secure default password for users without passwords
+        const defaultPassword = 'TempPassword123!';
+        const hashedPassword = await hashPassword(defaultPassword);
+        
+        const updatedUser: User = {
+          ...user,
+          password: hashedPassword
+        };
+        
+        await db.updateUser(updatedUser);
+        console.log(`Set default password for user: ${user.username} - Password: ${defaultPassword}`);
+        continue;
+      }
+      
       // Check if password is already hashed (bcrypt hashes start with $2a$, $2b$, or $2y$)
       if (!user.password.startsWith('$2')) {
         console.log(`Migrating user: ${user.username}`);
@@ -71,7 +89,7 @@ export const ensureAdminUser = async (): Promise<void> => {
       
       // Check if admin password needs to be upgraded to secure hashing
       const adminUser = adminUsers.find(u => u.username === 'admin');
-      if (adminUser && !adminUser.password.startsWith('$2b$')) {
+      if (adminUser && adminUser.password && !adminUser.password.startsWith('$2b$')) {
         console.log('Upgrading admin password to secure hash format');
         const hashedPassword = await hashPassword('SecureAdmin123!');
         const updatedAdmin: User = {

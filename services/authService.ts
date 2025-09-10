@@ -70,7 +70,17 @@ export const hashPassword = async (password: string): Promise<string> => {
  * Verifies a password against its hash
  */
 export const verifyPassword = async (password: string, hash: string): Promise<boolean> => {
-  return await bcrypt.compare(password, hash);
+  if (!password || !hash) {
+    console.error('verifyPassword called with empty password or hash');
+    return false;
+  }
+  
+  try {
+    return await bcrypt.compare(password, hash);
+  } catch (error) {
+    console.error('Password verification failed:', error);
+    return false;
+  }
 };
 
 /**
@@ -205,6 +215,12 @@ export const authenticateUser = async (username: string, password: string): Prom
     }
 
     // Verify password
+    if (!user.password) {
+      console.error(`User ${username} has no password set`);
+      recordFailedAttempt(username);
+      return { success: false, error: 'Invalid username or password' };
+    }
+    
     const isValidPassword = await verifyPassword(password, user.password);
     
     if (!isValidPassword) {
@@ -237,21 +253,38 @@ export const createSecureUser = async (userData: {
   assignedProfileIds?: string[];
 }): Promise<{ success: boolean; user?: User; error?: string }> => {
   try {
+    console.log('🔐 createSecureUser: Starting user creation');
+    console.log('🔐 createSecureUser: Input data:', {
+      username: userData.username,
+      password: userData.password ? '***PROVIDED***' : 'NOT PROVIDED',
+      role: userData.role,
+      assignedProfileIds: userData.assignedProfileIds
+    });
+    
     // Validate password strength
+    console.log('🔐 createSecureUser: Validating password strength');
     const passwordValidation = validatePasswordStrength(userData.password);
     if (!passwordValidation.isValid) {
+      console.error('🔐 createSecureUser: Password validation failed:', passwordValidation.errors);
       return { success: false, error: passwordValidation.errors.join('; ') };
     }
+    console.log('🔐 createSecureUser: Password validation passed');
 
     // Check if username already exists
+    console.log('🔐 createSecureUser: Checking if username exists');
     const db = DatabaseService.getInstance();
     const existingUser = await db.getUserByUsername(userData.username.toLowerCase());
     if (existingUser) {
+      console.error('🔐 createSecureUser: Username already exists:', userData.username);
       return { success: false, error: 'Username already exists' };
     }
+    console.log('🔐 createSecureUser: Username is available');
 
     // Hash password and create user
+    console.log('🔐 createSecureUser: Hashing password');
     const hashedPassword = await hashPassword(userData.password);
+    console.log('🔐 createSecureUser: Password hashed successfully, length:', hashedPassword.length);
+    
     const newUser: User = {
       id: crypto.randomUUID(),
       username: userData.username.toLowerCase(),
@@ -260,15 +293,35 @@ export const createSecureUser = async (userData: {
       assignedProfileIds: userData.assignedProfileIds || [],
     };
 
+    console.log('🔐 createSecureUser: Created user object:', {
+      id: newUser.id,
+      username: newUser.username,
+      password: newUser.password ? 'HASHED (' + newUser.password.length + ' chars)' : 'NO PASSWORD!',
+      role: newUser.role,
+      assignedProfileIds: newUser.assignedProfileIds
+    });
+
+    console.log('🔐 createSecureUser: Saving user to database');
     await db.createUser(newUser);
+    console.log('🔐 createSecureUser: User saved to database successfully');
+
+    // Verify the user was actually saved with password
+    console.log('🔐 createSecureUser: Verifying user was saved correctly');
+    const savedUser = await db.getUserByUsername(userData.username.toLowerCase());
+    console.log('🔐 createSecureUser: Verification result:', {
+      userFound: !!savedUser,
+      hasPassword: !!savedUser?.password,
+      passwordLength: savedUser?.password?.length
+    });
 
     // Return user without password
     const userResponse = { ...newUser };
     delete (userResponse as any).password;
 
+    console.log('🔐 createSecureUser: Returning success response');
     return { success: true, user: userResponse };
   } catch (error) {
-    console.error('User creation error:', error);
+    console.error('🔐 createSecureUser: User creation error:', error);
     return { success: false, error: 'Failed to create user' };
   }
 };

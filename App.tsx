@@ -46,6 +46,7 @@ import { DEFAULT_TEXT_MODEL, SOCIAL_MEDIA_PLATFORMS, TITLE_MAX_LENGTH, META_TITL
 import { authenticateUser } from './services/userService';
 import { validatePasswordStrength } from './services/authService';
 import { migrateUsersToHashedPasswords, ensureAdminUser } from './services/migrationService';
+import { passwordMigrationService } from './services/passwordMigrationService';
 import { initializeApiKeys } from './services/apiKeyService';
 import { saveBlogPost, deleteBlogPost } from './services/blogStorageService';
 import { getWriterProfiles, saveWriterProfiles, getSelectedWriterProfileId, setSelectedWriterProfileId } from './services/writerProfileService';
@@ -1949,6 +1950,7 @@ export const App: React.FC = () => {
       try {
         console.log('Running authentication migration...');
         await migrateUsersToHashedPasswords();
+        await passwordMigrationService.runMigrationIfNeeded();
         await ensureAdminUser();
         console.log('Migration completed');
         

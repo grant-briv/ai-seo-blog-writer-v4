@@ -1,6 +1,6 @@
 import type { User } from '../types';
 import { DatabaseService } from './databaseService';
-import { initializeSecureUsers } from './authService';
+import { initializeSecureUsers, createSecureUser, validatePasswordStrength, hashPassword } from './authService';
 
 // Use secure initialization
 const initializeUsers = initializeSecureUsers;
@@ -13,12 +13,20 @@ export const getUsers = async (): Promise<User[]> => {
 };
 
 /**
- * Saves a single user to the database.
+ * Saves a single user to the database with security checks.
+ * DEPRECATED: Use createSecureUser for new users instead.
  */
 export const saveUser = async (user: User): Promise<void> => {
     try {
         const db = DatabaseService.getInstance();
         const existingUser = await db.getUserById(user.id);
+        
+        // Security check: ensure password is hashed
+        if (user.password && !user.password.startsWith('$2b$')) {
+            console.warn('Attempting to save user with unhashed password. Hashing now.');
+            user.password = await hashPassword(user.password);
+        }
+        
         if (existingUser) {
             await db.updateUser(user);
         } else {
@@ -26,29 +34,26 @@ export const saveUser = async (user: User): Promise<void> => {
         }
     } catch (e) {
         console.error("Failed to save user:", e);
-        alert("Error: Could not save user data. Your changes may not persist.");
+        throw new Error("Failed to save user data");
     }
 };
 
 /**
- * Saves the entire list of users to the database.
+ * DEPRECATED: Use individual user operations instead.
+ * This function can lead to security issues if passwords aren't properly hashed.
  */
 export const saveUsers = async (users: User[]): Promise<void> => {
+    console.warn('saveUsers is deprecated. Use individual user operations instead.');
+    
     try {
-        const db = DatabaseService.getInstance();
         for (const user of users) {
-            const existingUser = await db.getUserById(user.id);
-            if (existingUser) {
-                await db.updateUser(user);
-            } else {
-                await db.createUser(user);
-            }
+            await saveUser(user);
         }
     } catch (e) {
         console.error("Failed to save users:", e);
-        alert("Error: Could not save user data. Your changes may not persist.");
+        throw new Error("Failed to save user data");
     }
 };
 
 // Re-export secure authentication from authService
-export { authenticateUser } from './authService';
+export { authenticateUser, createSecureUser, validatePasswordStrength } from './authService';
