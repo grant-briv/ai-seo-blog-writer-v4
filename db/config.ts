@@ -20,6 +20,11 @@ export function createDatabaseConnection() {
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   });
 
+  // Connect the client
+  client.connect().catch(err => {
+    console.error('Failed to connect to PostgreSQL:', err);
+  });
+
   return drizzle(client, { schema });
 }
 

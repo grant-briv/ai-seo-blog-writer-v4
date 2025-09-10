@@ -62,7 +62,8 @@ export class DatabaseService {
 
   private isProductionWithPostgres(): boolean {
     // Check if we have a DATABASE_URL environment variable (Railway provides this)
-    return !!(typeof window === 'undefined' || (process?.env?.DATABASE_URL || process?.env?.PGURL));
+    // Only use PostgreSQL on server-side (when window is undefined) and DATABASE_URL exists
+    return typeof window === 'undefined' && !!(process?.env?.DATABASE_URL || process?.env?.PGURL);
   }
 
   private getActiveDb() {
