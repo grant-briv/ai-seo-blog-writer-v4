@@ -5,6 +5,7 @@ import { Button } from './Button';
 import { AiWriterProfileForm } from './AiWriterProfileForm';
 import { PlusCircleIcon, TrashIcon, DocumentDuplicateIcon } from './Icons';
 import { DatabaseService } from '../services/databaseService';
+import { deleteWriterProfile, saveWriterProfile } from '../services/writerProfileService';
 
 interface WriterProfileManagerProps {
     profiles: AiWriterProfile[];
@@ -30,25 +31,33 @@ export const WriterProfileManager: React.FC<WriterProfileManagerProps> = ({ prof
         });
     }, [currentUser, profiles]);
 
-    const handleSaveProfile = (profileToSave: AiWriterProfile) => {
-        setProfiles(prev => {
-          const existingIndex = prev.findIndex(p => p.id === profileToSave.id);
-          if (existingIndex > -1) {
-            const updatedProfiles = [...prev];
-            updatedProfiles[existingIndex] = profileToSave;
-            return updatedProfiles;
-          }
-          return [...prev, profileToSave];
-        });
-        setEditingProfile(null);
+    const handleSaveProfile = async (profileToSave: AiWriterProfile) => {
+        try {
+          // Save to backend first
+          const savedProfile = await saveWriterProfile(profileToSave);
+          
+          // Then update local state with the profile returned from backend (has correct ID)
+          setProfiles(prev => {
+            const existingIndex = prev.findIndex(p => p.id === profileToSave.id);
+            if (existingIndex > -1) {
+              const updatedProfiles = [...prev];
+              updatedProfiles[existingIndex] = savedProfile;
+              return updatedProfiles;
+            }
+            return [...prev, savedProfile];
+          });
+          setEditingProfile(null);
+        } catch (error) {
+          console.error('Failed to save profile:', error);
+          alert('Error: Could not save writer profile. Please try again.');
+        }
     };
     
     const handleDeleteProfile = async (profileId: string) => {
         if (window.confirm("Are you sure you want to delete this AI Writer Profile? This action cannot be undone.")) {
           try {
-            // Actually delete from database first
-            const db = DatabaseService.getInstance();
-            await db.deleteWriterProfile(profileId);
+            // Delete from backend API or IndexedDB using the service
+            await deleteWriterProfile(profileId);
             
             // Then remove from local state
             setProfiles(prev => prev.filter(p => p.id !== profileId));

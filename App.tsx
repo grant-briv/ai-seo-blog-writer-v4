@@ -301,46 +301,8 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
     loadProfiles();
   }, []);
 
-  useEffect(() => {
-    const saveProfiles = async () => {
-      // Prevent saving too frequently (debounce)
-      const now = Date.now();
-      if (now - lastSaveTimestamp < 1000) {
-        console.log('🔄 Skipping auto-save - too frequent');
-        return;
-      }
-      
-      try {
-        console.log('💾 Auto-saving writer profiles to backend');
-        setLastSaveTimestamp(now);
-        
-        const savedProfiles = await saveWriterProfiles(writerProfiles);
-        // Update state with returned profiles if any IDs have changed
-        // Compare by checking if all IDs match in the same order
-        const idsMatch = savedProfiles.length === writerProfiles.length && 
-          savedProfiles.every((saved, index) => saved.id === writerProfiles[index]?.id);
-        
-        if (!idsMatch) {
-          console.log('🔄 Updating writer profiles with new IDs from backend');
-          // Use setTimeout to prevent immediate re-trigger
-          setTimeout(() => {
-            setWriterProfiles(savedProfiles);
-          }, 50);
-        }
-      } catch (e) {
-        console.error("Error saving profiles to database:", e);
-        if (e.message && e.message.includes('not authenticated')) {
-          setError("Session expired. Please log in again to save writer profiles.");
-        } else {
-          setError("Could not save writer profiles. Please check your connection and try again.");
-        }
-      }
-    };
-    
-    if (writerProfiles.length > 0 && currentUser) {
-      saveProfiles();
-    }
-  }, [writerProfiles, currentUser, lastSaveTimestamp]);
+  // Removed problematic auto-save useEffect that was causing duplicate profiles
+  // Writer profiles are now saved explicitly when users create/edit them in WriterProfileManager
 
   useEffect(() => {
     const saveSelectedProfile = async () => {
