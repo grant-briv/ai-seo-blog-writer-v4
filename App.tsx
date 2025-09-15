@@ -2,7 +2,7 @@
 
 
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { TextInput } from './components/TextInput';
 import { TextAreaInput } from './components/TextAreaInput';
@@ -43,10 +43,9 @@ import type {
 import { AdminPage } from './components/AdminPage';
 import { WriterProfileSelector } from './components/WriterProfileSelector';
 import { DEFAULT_TEXT_MODEL, SOCIAL_MEDIA_PLATFORMS, TITLE_MAX_LENGTH, META_TITLE_MAX_LENGTH, META_DESCRIPTION_MAX_LENGTH } from './constants';
-import { authenticateUser } from './services/userService';
 import { validatePasswordStrength } from './services/authService';
-import { migrateUsersToHashedPasswords, ensureAdminUser } from './services/migrationService';
-import { passwordMigrationService } from './services/passwordMigrationService';
+import { apiClient } from './services/apiClient';
+// Removed migration imports - using API backend now
 import { initializeApiKeys } from './services/apiKeyService';
 import { saveBlogPost, deleteBlogPost } from './services/blogStorageService';
 import { getWriterProfiles, saveWriterProfiles, getSelectedWriterProfileId, setSelectedWriterProfileId } from './services/writerProfileService';
@@ -86,18 +85,13 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
     e.preventDefault();
     setError('');
     try {
-      const result = await authenticateUser(username, password);
+      const result = await apiClient.login(username, password);
       if (result.success && result.user && result.token) {
         // Store secure session token
         sessionStorage.setItem('authToken', result.token);
         onLogin(result.user);
       } else {
-        if (result.lockedUntil) {
-          const lockoutMinutes = Math.ceil((result.lockedUntil - Date.now()) / (1000 * 60));
-          setError(`Account temporarily locked. Try again in ${lockoutMinutes} minutes.`);
-        } else {
-          setError(result.error || 'Invalid username or password.');
-        }
+        setError('Invalid username or password.');
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -146,8 +140,7 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 space-y-6">
         <div className="text-center">
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <WordpressIcon className="w-12 h-12 text-sky-600" />
+          <div className="text-center mb-4">
             <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-600 to-cyan-500">
               AI SEO Blog Writer
             </h1>
@@ -297,7 +290,11 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
         }
       } catch (e) {
         console.error("Error loading profiles from database:", e);
-        setError("Could not load writer profiles from database. Data might be corrupted.");
+        if (e.message && e.message.includes('not authenticated')) {
+          setError("Session expired. Please log in again to access writer profiles.");
+        } else {
+          setError("Could not load writer profiles. Please check your connection and try again.");
+        }
       }
     };
     loadProfiles();
@@ -305,17 +302,44 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
   useEffect(() => {
     const saveProfiles = async () => {
+      // Prevent saving too frequently (debounce)
+      const now = Date.now();
+      if (now - lastSaveTimestamp < 1000) {
+        console.log('🔄 Skipping auto-save - too frequent');
+        return;
+      }
+      
       try {
-        await saveWriterProfiles(writerProfiles);
+        console.log('💾 Auto-saving writer profiles to backend');
+        setLastSaveTimestamp(now);
+        
+        const savedProfiles = await saveWriterProfiles(writerProfiles);
+        // Update state with returned profiles if any IDs have changed
+        // Compare by checking if all IDs match in the same order
+        const idsMatch = savedProfiles.length === writerProfiles.length && 
+          savedProfiles.every((saved, index) => saved.id === writerProfiles[index]?.id);
+        
+        if (!idsMatch) {
+          console.log('🔄 Updating writer profiles with new IDs from backend');
+          // Use setTimeout to prevent immediate re-trigger
+          setTimeout(() => {
+            setWriterProfiles(savedProfiles);
+          }, 50);
+        }
       } catch (e) {
         console.error("Error saving profiles to database:", e);
-        setError("Could not save writer profiles to database. Changes might not persist.");
+        if (e.message && e.message.includes('not authenticated')) {
+          setError("Session expired. Please log in again to save writer profiles.");
+        } else {
+          setError("Could not save writer profiles. Please check your connection and try again.");
+        }
       }
     };
-    if (writerProfiles.length > 0) {
+    
+    if (writerProfiles.length > 0 && currentUser) {
       saveProfiles();
     }
-  }, [writerProfiles]);
+  }, [writerProfiles, currentUser, lastSaveTimestamp]);
 
   useEffect(() => {
     const saveSelectedProfile = async () => {
@@ -1210,8 +1234,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 p-4 md:p-8 font-sans">
       <header className="mb-6 text-center relative">
-        <div className="flex items-center justify-center space-x-3 mb-2">
-          <WordpressIcon className="w-10 h-10 text-sky-600" />
+        <div className="text-center mb-2">
           <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-600 to-cyan-500">
             AI SEO Blog Writer
           </h1>
@@ -1667,7 +1690,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             />
           )}
 
-          <SectionCard title="Live WordPress-Style Preview" icon={<WordpressIcon className="w-6 h-6 text-sky-600"/>} >
+          <SectionCard title="Live Blog Preview" icon={<DocumentTextIcon className="w-6 h-6 text-sky-600"/>} >
             <div className="bg-white p-6 rounded-md shadow-lg min-h-[600px] text-gray-800 overflow-y-auto max-h-[calc(100vh-150px)] border border-gray-200">
               {seoSettings.title && <h1 className="text-3xl font-bold mb-4 text-gray-900">{seoSettings.title}</h1>}
               <BlogPreview content={mainContent} />
@@ -1943,26 +1966,28 @@ export const App: React.FC = () => {
       return null;
     }
   });
+  
+  // State to track last save timestamp to prevent infinite loops
+  const [lastSaveTimestamp, setLastSaveTimestamp] = useState(0);
 
-  // Run migration on app startup
+  // API initialization on app startup
   React.useEffect(() => {
-    const runMigration = async () => {
+    const initializeApp = async () => {
       try {
-        console.log('Running authentication migration...');
-        await migrateUsersToHashedPasswords();
-        await passwordMigrationService.runMigrationIfNeeded();
-        await ensureAdminUser();
-        console.log('Migration completed');
+        console.log('Initializing app with API backend...');
         
+        // Only initialize API keys (no user migration needed with API backend)
         console.log('Initializing API keys...');
         await initializeApiKeys();
         console.log('API keys initialized');
+        
+        console.log('App initialization completed');
       } catch (error) {
-        console.error('Migration failed:', error);
+        console.error('App initialization failed:', error);
       }
     };
     
-    runMigration();
+    initializeApp();
   }, []);
 
   const handleLogin = (user: User) => {
