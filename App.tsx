@@ -238,6 +238,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
   // Profiles state
   const [writerProfiles, setWriterProfiles] = useState<AiWriterProfile[]>([]);
+  const [lastSaveTimestamp, setLastSaveTimestamp] = useState(0);
   const [selectedWriterProfileId, setSelectedWriterProfileId] = useState<string | null>(null);
 
   // Feature-specific state
@@ -1967,8 +1968,6 @@ export const App: React.FC = () => {
     }
   });
   
-  // State to track last save timestamp to prevent infinite loops
-  const [lastSaveTimestamp, setLastSaveTimestamp] = useState(0);
 
   // API initialization on app startup
   React.useEffect(() => {
