@@ -42,9 +42,32 @@ export const appSettings = pgTable('app_settings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const userSettings = pgTable('user_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  key: text('key').notNull(),
+  value: text('value'),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const encryptedApiKeys = pgTable('encrypted_api_keys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),
+  keyName: text('key_name').notNull(),
+  encryptedValue: text('encrypted_value').notNull(), // Client-side encrypted API key
+  description: text('description').notNull(),
+  isActive: text('is_active').notNull().default('true'), // 'true' | 'false' as text
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type WriterProfile = typeof writerProfiles.$inferSelect;
 export type NewWriterProfile = typeof writerProfiles.$inferInsert;
 export type SavedBlogPost = typeof savedBlogPosts.$inferSelect;
 export type NewSavedBlogPost = typeof savedBlogPosts.$inferInsert;
+export type UserSetting = typeof userSettings.$inferSelect;
+export type NewUserSetting = typeof userSettings.$inferInsert;
+export type EncryptedApiKey = typeof encryptedApiKeys.$inferSelect;
+export type NewEncryptedApiKey = typeof encryptedApiKeys.$inferInsert;

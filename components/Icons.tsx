@@ -5,8 +5,52 @@ interface IconProps {
 }
 
 export const WordpressIcon: React.FC<IconProps> = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2.95-9.95c-.6-.6-.6-1.58 0-2.18.29-.29.68-.44 1.09-.44h3.72c.41 0 .8.15 1.09.44.6.6.6 1.58 0 2.18l-2.18 2.18-1.09 3.27h-1.09l-1.09-3.27L9.05 10.05zm1.09-5.09h3.72v1.09H10.14v-1.09zm-2.73 7.63l1.09-3.27 1.64 1.64-1.09 3.27h3.27l-1.09-3.27 1.64-1.64 1.09 3.27h1.64L16.91 9.5c-.15-.41-.44-.7-.8-.8H7.89c-.36.1-.65.39-.8.8l-1.64 4.36h1.64z"/>
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="currentColor">
+    {/* Outer circle - represents completeness and AI brain */}
+    <circle cx="50" cy="50" r="48" fill="none" stroke="currentColor" strokeWidth="3" opacity="0.3"/>
+    
+    {/* Central AI brain/neural network */}
+    <g transform="translate(50,50)">
+      {/* Central node */}
+      <circle cx="0" cy="0" r="4" fill="currentColor"/>
+      
+      {/* Neural connections - representing AI */}
+      <g opacity="0.8" strokeWidth="2" stroke="currentColor" fill="none">
+        <line x1="-15" y1="-15" x2="15" y2="15"/>
+        <line x1="15" y1="-15" x2="-15" y2="15"/>
+        <line x1="-20" y1="0" x2="20" y2="0"/>
+        <line x1="0" y1="-20" x2="0" y2="20"/>
+      </g>
+      
+      {/* Surrounding nodes */}
+      <circle cx="-15" cy="-15" r="2.5" fill="currentColor" opacity="0.7"/>
+      <circle cx="15" cy="-15" r="2.5" fill="currentColor" opacity="0.7"/>
+      <circle cx="-15" cy="15" r="2.5" fill="currentColor" opacity="0.7"/>
+      <circle cx="15" cy="15" r="2.5" fill="currentColor" opacity="0.7"/>
+      <circle cx="-20" cy="0" r="2.5" fill="currentColor" opacity="0.7"/>
+      <circle cx="20" cy="0" r="2.5" fill="currentColor" opacity="0.7"/>
+      <circle cx="0" cy="-20" r="2.5" fill="currentColor" opacity="0.7"/>
+      <circle cx="0" cy="20" r="2.5" fill="currentColor" opacity="0.7"/>
+    </g>
+    
+    {/* SEO magnifying glass - top right */}
+    <g transform="translate(70,30)">
+      <circle cx="0" cy="0" r="8" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.6"/>
+      <line x1="6" y1="6" x2="12" y2="12" stroke="currentColor" strokeWidth="2" opacity="0.6"/>
+    </g>
+    
+    {/* Writing/Content - represented by document lines - bottom left */}
+    <g transform="translate(25,70)" opacity="0.6">
+      <line x1="0" y1="-8" x2="16" y2="-8" stroke="currentColor" strokeWidth="2"/>
+      <line x1="0" y1="-4" x2="12" y2="-4" stroke="currentColor" strokeWidth="2"/>
+      <line x1="0" y1="0" x2="14" y2="0" stroke="currentColor" strokeWidth="2"/>
+      <line x1="0" y1="4" x2="10" y2="4" stroke="currentColor" strokeWidth="2"/>
+    </g>
+    
+    {/* Trending/Growth arrow - representing optimization */}
+    <g transform="translate(75,75)" opacity="0.5">
+      <path d="M-8 4 L4 -8 L8 -4 L4 -8 L4 8" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+    </g>
   </svg>
 );
 

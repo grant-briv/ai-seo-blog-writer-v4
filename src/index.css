@@ -1,0 +1,27 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #e5e7eb; /* Light gray track for light theme */
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #9ca3af; /* Medium gray thumb */
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280; /* Darker gray thumb on hover */
+}
+
+/* Basic body styling for better aesthetics */
+body {
+  font-family: 'Inter', sans-serif; /* A common, clean sans-serif font */
+}

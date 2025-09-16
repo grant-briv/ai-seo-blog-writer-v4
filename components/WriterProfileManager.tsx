@@ -4,7 +4,6 @@ import type { AiWriterProfile, User } from '../types';
 import { Button } from './Button';
 import { AiWriterProfileForm } from './AiWriterProfileForm';
 import { PlusCircleIcon, TrashIcon, DocumentDuplicateIcon } from './Icons';
-import { DatabaseService } from '../services/databaseService';
 import { deleteWriterProfile, saveWriterProfile } from '../services/writerProfileService';
 
 interface WriterProfileManagerProps {

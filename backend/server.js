@@ -15,6 +15,9 @@ import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import writerProfileRoutes from './routes/writerProfiles.js';
 import userSettingsRoutes from './routes/userSettings.js';
+import savedBlogsRoutes from './routes/savedBlogs.js';
+import topicSearchesRoutes from './routes/topicSearches.js';
+import encryptedApiKeysRoutes from './routes/encryptedApiKeys.js';
 import { authenticateToken } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -112,6 +115,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', authenticateToken, userRoutes);
 app.use('/api/writer-profiles', authenticateToken, writerProfileRoutes);
 app.use('/api/user-settings', authenticateToken, userSettingsRoutes);
+app.use('/api/saved-blogs', authenticateToken, savedBlogsRoutes);
+app.use('/api/topic-searches', authenticateToken, topicSearchesRoutes);
+app.use('/api/encrypted-api-keys', authenticateToken, encryptedApiKeysRoutes);
 
 // Serve static frontend files in production
 if (process.env.NODE_ENV === 'production') {

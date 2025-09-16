@@ -50,13 +50,13 @@ export const KnowledgeBaseManager: React.FC<KnowledgeBaseManagerProps> = ({
 
       for (const file of Array.from(files)) {
         // Validate file
-        const validation = DocumentProcessingService.validateFile(file);
+        const validation = DocumentProcessingService.validateFile(file as File);
         if (!validation.isValid) {
-          throw new Error(`${file.name}: ${validation.error}`);
+          throw new Error(`${(file as File).name}: ${validation.error}`);
         }
 
         // Process file
-        const document = await DocumentProcessingService.processFile(file, profileId);
+        const document = await DocumentProcessingService.processFile(file as File, profileId);
         newDocuments.push(document);
       }
 

@@ -7,6 +7,7 @@ import { TextInput } from './TextInput';
 import { Button } from './Button';
 import { SectionCard } from './SectionCard';
 import { searchGoogleNews, deepResearchOnTopic, analyzeArticleViralPotential, generateTrendingQuestions, researchHeadlineIdea, performEnhancedTopicSearch, RateLimitError } from '../services/geminiService';
+import TopicSearchService from '../services/topicSearchService';
 import type { Article, ArticleStats, GroundingSource, EnhancedSearchResult, TrendAnalysis } from '../types';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SaveIcon, SparklesIcon, SearchCircleIcon, TrendingUpIcon, LightBulbIcon } from './Icons';
@@ -17,6 +18,7 @@ interface TopicFinderProps {
     selectedKeyword?: string;
 }
 
+// Legacy key for migration from localStorage (no longer used)
 const SAVED_SEARCHES_KEY = 'ai_blog_writer_topic_searches';
 
 const getEngagementColor = (score: number) => {
@@ -49,14 +51,50 @@ export const TopicFinder: React.FC<TopicFinderProps> = ({ onSetDeepResearchInfo,
     const [showAdvancedSources, setShowAdvancedSources] = useState<boolean>(false);
 
     useEffect(() => {
-        try {
-            const storedSearches = localStorage.getItem(SAVED_SEARCHES_KEY);
-            if (storedSearches) {
-                setSavedSearches(JSON.parse(storedSearches));
+        const loadSavedSearches = async () => {
+            try {
+                // Load from API
+                const searches = await TopicSearchService.getSavedSearchesForUser();
+                setSavedSearches(searches);
+                
+                // Migrate from localStorage if API is empty and localStorage has data
+                if (searches.length === 0) {
+                    const legacySearches = localStorage.getItem(SAVED_SEARCHES_KEY);
+                    if (legacySearches) {
+                        const parsedSearches = JSON.parse(legacySearches);
+                        if (parsedSearches.length > 0) {
+                            console.log('🔍 Migrating topic searches from localStorage to API');
+                            // Migrate each search to the API
+                            for (const search of parsedSearches) {
+                                try {
+                                    await TopicSearchService.insertSavedSearch(search);
+                                } catch (error) {
+                                    console.warn('Failed to migrate search:', search, error);
+                                }
+                            }
+                            // Reload after migration
+                            const migratedSearches = await TopicSearchService.getSavedSearchesForUser();
+                            setSavedSearches(migratedSearches);
+                            // Clean up localStorage
+                            localStorage.removeItem(SAVED_SEARCHES_KEY);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Could not load saved searches from API, falling back to localStorage:", e);
+                // Fallback to localStorage if API fails
+                try {
+                    const storedSearches = localStorage.getItem(SAVED_SEARCHES_KEY);
+                    if (storedSearches) {
+                        setSavedSearches(JSON.parse(storedSearches));
+                    }
+                } catch (localError) {
+                    console.error("Could not load saved searches from localStorage either:", localError);
+                }
             }
-        } catch (e) {
-            console.error("Could not load saved searches from local storage.", e);
-        }
+        };
+        
+        loadSavedSearches();
     }, []);
     
     useEffect(() => {
@@ -99,18 +137,37 @@ export const TopicFinder: React.FC<TopicFinderProps> = ({ onSetDeepResearchInfo,
         handleSearch(searchQuery);
     };
 
-    const handleSaveSearch = () => {
-        if (searchQuery.trim() && !savedSearches.includes(searchQuery.trim().toLowerCase())) {
-            const newSavedSearches = [...savedSearches, searchQuery.trim().toLowerCase()];
-            setSavedSearches(newSavedSearches);
-            localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(newSavedSearches));
+    const handleSaveSearch = async () => {
+        const searchToSave = searchQuery.trim().toLowerCase();
+        if (searchToSave && !savedSearches.includes(searchToSave)) {
+            try {
+                await TopicSearchService.insertSavedSearch(searchToSave);
+                // Reload searches from API to get the updated list
+                const updatedSearches = await TopicSearchService.getSavedSearchesForUser();
+                setSavedSearches(updatedSearches);
+            } catch (error) {
+                console.error('Failed to save search:', error);
+                // Fallback to localStorage
+                const newSavedSearches = [...savedSearches, searchToSave];
+                setSavedSearches(newSavedSearches);
+                localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(newSavedSearches));
+            }
         }
     };
 
-    const handleDeleteSearch = (searchToDelete: string) => {
-        const newSavedSearches = savedSearches.filter(s => s !== searchToDelete);
-        setSavedSearches(newSavedSearches);
-        localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(newSavedSearches));
+    const handleDeleteSearch = async (searchToDelete: string) => {
+        try {
+            await TopicSearchService.deleteSavedSearch(searchToDelete);
+            // Reload searches from API to get the updated list
+            const updatedSearches = await TopicSearchService.getSavedSearchesForUser();
+            setSavedSearches(updatedSearches);
+        } catch (error) {
+            console.error('Failed to delete search:', error);
+            // Fallback to localStorage
+            const newSavedSearches = savedSearches.filter(s => s !== searchToDelete);
+            setSavedSearches(newSavedSearches);
+            localStorage.setItem(SAVED_SEARCHES_KEY, JSON.stringify(newSavedSearches));
+        }
     };
     
     const handleDeepResearch = async (article: Article) => {

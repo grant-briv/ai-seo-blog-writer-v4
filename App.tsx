@@ -43,10 +43,10 @@ import type {
 import { AdminPage } from './components/AdminPage';
 import { WriterProfileSelector } from './components/WriterProfileSelector';
 import { DEFAULT_TEXT_MODEL, SOCIAL_MEDIA_PLATFORMS, TITLE_MAX_LENGTH, META_TITLE_MAX_LENGTH, META_DESCRIPTION_MAX_LENGTH } from './constants';
-import { validatePasswordStrength } from './services/authService';
+import { validatePasswordStrength } from './services/passwordValidation';
 import { apiClient } from './services/apiClient';
 // Removed migration imports - using API backend now
-import { initializeApiKeys } from './services/apiKeyService';
+// No longer using IndexedDB for API keys - using environment variables
 import { saveBlogPost, deleteBlogPost } from './services/blogStorageService';
 import { getWriterProfiles, saveWriterProfiles, getSelectedWriterProfileId, setSelectedWriterProfileId } from './services/writerProfileService';
 import { TopicFinder } from './components/TopicFinder';
@@ -87,8 +87,7 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
     try {
       const result = await apiClient.login(username, password);
       if (result.success && result.user && result.token) {
-        // Store secure session token
-        sessionStorage.setItem('authToken', result.token);
+        // Token is automatically stored by apiClient.login()
         onLogin(result.user);
       } else {
         setError('Invalid username or password.');
@@ -273,6 +272,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
   useEffect(() => {
     const loadProfiles = async () => {
       try {
+        console.log('🔄 Loading writer profiles for authenticated user...');
         const profiles = await getWriterProfiles();
         const updatedProfiles = profiles.map(p => ({
           ...p,
@@ -284,11 +284,15 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
           websiteBlogUrl: p.websiteBlogUrl || '',
         }));
         setWriterProfiles(updatedProfiles);
+        console.log(`✅ Loaded ${updatedProfiles.length} writer profiles`);
         
         const selectedId = await getSelectedWriterProfileId();
         if (selectedId) {
           setSelectedWriterProfileId(selectedId);
         }
+        
+        // Clear any previous errors
+        setError(null);
       } catch (e) {
         console.error("Error loading profiles from database:", e);
         if (e.message && e.message.includes('not authenticated')) {
@@ -298,8 +302,14 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
         }
       }
     };
-    loadProfiles();
-  }, []);
+    
+    // Only load profiles if we have a current user (authenticated)
+    if (currentUser) {
+      loadProfiles();
+    } else {
+      console.log('⏳ Waiting for user authentication before loading profiles...');
+    }
+  }, [currentUser]); // Depend on currentUser instead of empty array
 
   // Removed problematic auto-save useEffect that was causing duplicate profiles
   // Writer profiles are now saved explicitly when users create/edit them in WriterProfileManager
@@ -943,12 +953,12 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
   }, []);
 
   const handleDeleteBlog = useCallback((blogId: string) => {
-    deleteBlogPost(blogId, currentUser.id);
+    deleteBlogPost(blogId);
     // If the currently loaded blog is the one being deleted, reset the ID
     if (savedBlogId === blogId) {
         setSavedBlogId(null);
     }
-  }, [currentUser.id, savedBlogId]);
+  }, [savedBlogId]);
 
   const handleSetDeepResearchInfo = useCallback((info: string) => {
     setBlogInputs(prev => ({
@@ -1921,26 +1931,46 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    // Check session storage for a logged-in user to persist across reloads
+    // Check if we have both a stored user and a valid token
     try {
       const storedUser = sessionStorage.getItem('currentUser');
-      return storedUser ? JSON.parse(storedUser) : null;
+      const token = localStorage.getItem('auth_token');
+      
+      if (storedUser && token) {
+        // Token exists, verify it's still valid (this will be done in useEffect)
+        return JSON.parse(storedUser);
+      }
     } catch {
-      return null;
+      // If anything fails, clear both storage items
+      sessionStorage.removeItem('currentUser');
+      localStorage.removeItem('auth_token');
     }
+    return null;
   });
   
 
-  // API initialization on app startup
+  // Token verification and app initialization
   React.useEffect(() => {
     const initializeApp = async () => {
       try {
         console.log('Initializing app with API backend...');
         
-        // Only initialize API keys (no user migration needed with API backend)
-        console.log('Initializing API keys...');
-        await initializeApiKeys();
-        console.log('API keys initialized');
+        // If we have a stored user, verify the token is still valid
+        if (currentUser && apiClient.isAuthenticated()) {
+          try {
+            console.log('🔐 Verifying stored authentication token...');
+            await apiClient.verifyToken();
+            console.log('✅ Token verified successfully');
+          } catch (tokenError) {
+            console.warn('❌ Token verification failed, logging out:', tokenError);
+            // Token is invalid, clear user session
+            setCurrentUser(null);
+            sessionStorage.removeItem('currentUser');
+            apiClient.logout(); // This will clear localStorage token
+          }
+        }
+        
+        // API keys are now handled via environment variables - no initialization needed
         
         console.log('App initialization completed');
       } catch (error) {
@@ -1949,7 +1979,7 @@ export const App: React.FC = () => {
     };
     
     initializeApp();
-  }, []);
+  }, [currentUser]); // Re-run when currentUser changes
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -1959,6 +1989,7 @@ export const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     sessionStorage.removeItem('currentUser');
+    apiClient.logout(); // Clear API client token
   };
 
   if (!currentUser) {

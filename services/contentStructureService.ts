@@ -89,18 +89,7 @@ function buildPromptWithProfile(
     // Use legacy text field for knowledge base (maintain backward compatibility)
     let knowledgeContent = profileData.knowledgeDocumentsText || '';
     
-    // If we have enhanced knowledge documents, combine them
-    if (profileData.knowledgeDocuments && profileData.knowledgeDocuments.length > 0) {
-      const documentsContent = profileData.knowledgeDocuments
-        .map(doc => `--- ${doc.name} (${doc.type.toUpperCase()}) ---\n${doc.content}`)
-        .join('\n\n');
-      
-      if (knowledgeContent.trim()) {
-        knowledgeContent = knowledgeContent.trim() + '\n\n' + documentsContent;
-      } else {
-        knowledgeContent = documentsContent;
-      }
-    }
+    // Enhanced knowledge documents are handled through knowledgeDocumentsText
     
     if (knowledgeContent.trim()) {
       fullPrompt += `\n\n**Relevant Knowledge Base (Use this information to inform your response if relevant):**\n${knowledgeContent}`;

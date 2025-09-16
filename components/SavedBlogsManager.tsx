@@ -17,7 +17,7 @@ export const SavedBlogsManager: React.FC<SavedBlogsManagerProps> = ({ currentUse
     useEffect(() => {
         const loadBlogs = async () => {
             try {
-                const blogs = await getSavedBlogsForUser(currentUser.id);
+                const blogs = await getSavedBlogsForUser();
                 setSavedBlogs(blogs);
             } catch (e) {
                 console.error('Failed to load saved blogs:', e);
@@ -31,7 +31,7 @@ export const SavedBlogsManager: React.FC<SavedBlogsManagerProps> = ({ currentUse
         if (window.confirm(`Are you sure you want to delete the saved blog "${blogTitle}"? This action cannot be undone.`)) {
             onDeleteBlog(blogId);
             try {
-                const blogs = await getSavedBlogsForUser(currentUser.id);
+                const blogs = await getSavedBlogsForUser();
                 setSavedBlogs(blogs);
             } catch (e) {
                 console.error('Failed to refresh saved blogs after delete:', e);
