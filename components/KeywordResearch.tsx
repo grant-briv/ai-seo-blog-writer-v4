@@ -49,6 +49,14 @@ export const KeywordResearch: React.FC<KeywordResearchProps> = ({ profileData, o
     if (adminConfig && keywordsEverywhereService.isConfigured(adminConfig)) {
       return adminConfig;
     }
+    // Finally check environment variable
+    const envApiKey = import.meta.env.VITE_KEYWORDS_EVERYWHERE_API_KEY;
+    if (envApiKey) {
+      return {
+        apiKey: envApiKey,
+        isEnabled: true
+      };
+    }
     return null;
   };
 
