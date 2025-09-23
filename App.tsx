@@ -80,6 +80,9 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetResult, setResetResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,37 +101,98 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
     }
   };
 
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      setResetResult({ success: false, message: 'Please enter your email address' });
+      return;
+    }
+
+    setIsResetting(true);
+    setResetResult(null);
+
+    try {
+      // Import emailApiService dynamically
+      const { emailApiService } = await import('./services/emailApiService');
+      
+      // For password reset, backend will get email config from admin settings
+      const result = await emailApiService.sendPasswordReset({
+        email: resetEmail.trim()
+      });
+
+      setResetResult(result);
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      setResetResult({
+        success: false,
+        message: error.message || 'Failed to send password reset email'
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   if (showForgotPassword) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 font-montserrat">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 space-y-6">
           <div className="text-center">
             <h1 className="text-3xl font-bold text-place-teal mb-4">Password Reset</h1>
-            <p className="text-gray-600">Contact your system administrator to reset your password</p>
+            <p className="text-gray-600">Enter your email address to receive a password reset link</p>
           </div>
-          <div className="bg-teal-50 border border-place-teal text-teal-800 px-4 py-3 rounded-lg text-sm" role="alert">
-            <p><strong>For Security:</strong> Password resets must be performed by an administrator.</p>
-            <p className="mt-2">Please contact your system administrator with:</p>
-            <ul className="mt-2 ml-4 list-disc text-xs">
-              <li>Your username</li>
-              <li>Reason for password reset</li>
-              <li>Identity verification information</li>
-            </ul>
-          </div>
-          <div className="space-y-4">
-            <div className="text-center text-sm text-gray-600">
-              <p><strong>Admin Contact Methods:</strong></p>
-              <p className="mt-2">• Internal support ticket system</p>
-              <p>• Direct communication with IT department</p>
-              <p>• Secure authentication via existing channels</p>
+          
+          <form onSubmit={handlePasswordReset} className="space-y-4">
+            <div>
+              <label htmlFor="resetEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="resetEmail"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="Enter your email address"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-place-teal focus:border-place-teal"
+                disabled={isResetting}
+                required
+              />
             </div>
-            <Button 
-              type="button" 
-              onClick={() => setShowForgotPassword(false)} 
-              className="w-full btn btn-primary"
-            >
-              Back to Login
-            </Button>
+            
+            {resetResult && (
+              <div className={`p-3 rounded-md text-sm ${
+                resetResult.success 
+                  ? 'bg-green-50 border border-green-200 text-green-800' 
+                  : 'bg-red-50 border border-red-200 text-red-800'
+              }`}>
+                {resetResult.message}
+              </div>
+            )}
+            
+            <div className="space-y-3">
+              <Button 
+                type="submit" 
+                disabled={isResetting || !resetEmail.trim()}
+                className="w-full btn btn-primary"
+              >
+                {isResetting ? 'Sending Reset Link...' : 'Send Reset Link'}
+              </Button>
+              
+              <Button 
+                type="button" 
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setResetEmail('');
+                  setResetResult(null);
+                }} 
+                className="w-full btn btn-secondary"
+              >
+                Back to Login
+              </Button>
+            </div>
+          </form>
+          
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg text-sm">
+            <p><strong>Security Note:</strong> Password reset links expire in 1 hour. If you don't receive the email, check your spam folder or contact your administrator.</p>
           </div>
         </div>
       </div>

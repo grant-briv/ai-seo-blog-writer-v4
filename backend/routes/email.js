@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
+import crypto from 'crypto';
 
 const router = express.Router();
 
@@ -159,5 +160,207 @@ router.post('/test', authenticateToken, async (req, res) => {
   }
 });
 
+// Password reset email handler
+const sendPasswordResetHandler = async (req, res) => {
+  const { userEmail, resetLink, companyName, emailConfig } = req.body;
+  
+  if (!emailConfig || !emailConfig.isEnabled) {
+    return res.status(400).json({ error: 'Email service not configured' });
+  }
+  
+  if (!emailConfig.apiKey || !emailConfig.domain || !emailConfig.fromEmail) {
+    return res.status(400).json({ error: 'Missing email configuration' });
+  }
+  
+  console.log('📧 Sending password reset email via backend');
+  
+  // Generate email content
+  const textBody = `
+Password Reset Request for ${companyName || 'PLACE'}
+
+You have requested a password reset for your account.
+
+If you did not request this reset, please ignore this email and your password will remain unchanged.
+
+To reset your password, click the link below:
+${resetLink}
+
+This link will expire in 1 hour for security reasons.
+
+If you have any questions, please contact your system administrator.
+
+Best regards,
+${companyName || 'PLACE'} Team
+  `.trim();
+  
+  const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Montserrat', Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #000; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .reset-box { background: white; padding: 20px; border-left: 4px solid #59c4c4; margin: 20px 0; border-radius: 5px; }
+        .button { display: inline-block; background: #59c4c4; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; }
+        .warning { background: #fef3cd; border: 1px solid #fecaca; color: #92400e; padding: 12px; border-radius: 5px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Password Reset Request</h1>
+        </div>
+        <div class="content">
+            <p>Hello,</p>
+            <p>You have requested a password reset for your <strong>${companyName || 'PLACE'}</strong> account.</p>
+            
+            <div class="reset-box">
+                <h3>Reset Your Password</h3>
+                <p>Click the button below to reset your password:</p>
+                <p style="text-align: center; margin: 20px 0;">
+                    <a href="${resetLink}" class="button">Reset Password</a>
+                </p>
+                <p style="font-size: 12px; color: #666;">
+                    Or copy and paste this link in your browser:<br>
+                    <a href="${resetLink}" style="color: #59c4c4; word-break: break-all;">${resetLink}</a>
+                </p>
+            </div>
+            
+            <div class="warning">
+                <p><strong>Important:</strong></p>
+                <ul style="margin: 5px 0; padding-left: 20px;">
+                    <li>This link will expire in 1 hour for security</li>
+                    <li>If you didn't request this reset, ignore this email</li>
+                    <li>Your password will remain unchanged if you don't click the link</li>
+                </ul>
+            </div>
+            
+            <p>If you have any questions, please contact your system administrator.</p>
+            <p>Best regards,<br><strong>${companyName || 'PLACE'} Team</strong></p>
+        </div>
+    </div>
+</body>
+</html>
+  `.trim();
+  
+  // Prepare form data for Mailgun API
+  const formData = new URLSearchParams();
+  formData.append('from', `${companyName || 'PLACE'} <${emailConfig.fromEmail}>`);
+  formData.append('to', userEmail);
+  formData.append('subject', `Password Reset Request - ${companyName || 'PLACE'}`);
+  formData.append('text', textBody);
+  formData.append('html', htmlBody);
+
+  // Make Mailgun API call from backend
+  const response = await fetch(`https://api.mailgun.net/v3/${emailConfig.domain}/messages`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${Buffer.from(`api:${emailConfig.apiKey}`).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: formData
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Mailgun API error:', response.status, response.statusText, errorText);
+    return res.status(500).json({ 
+      error: `Mailgun API error: ${response.status} ${response.statusText}`,
+      details: errorText
+    });
+  }
+
+  const result = await response.json();
+  console.log('📧 Mailgun password reset email sent successfully:', result);
+  
+  return res.json({ success: true, message: 'Password reset email sent successfully', mailgunResponse: result });
+};
+
+// POST /api/email/password-reset - Send password reset email
+router.post('/password-reset', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required' });
+    }
+    
+    // Get email configuration from admin user settings
+    // Find admin user first
+    const adminUsers = await req.app.locals.db.select().from(req.app.locals.schema.users).where(req.app.locals.schema.users.role.eq('admin'));
+    
+    if (adminUsers.length === 0) {
+      return res.status(500).json({ error: 'No admin user found to configure email service' });
+    }
+    
+    const adminUser = adminUsers[0]; // Use first admin user
+    
+    // Get email settings for admin user
+    const emailSettings = await req.app.locals.db.select().from(req.app.locals.schema.userSettings)
+      .where(req.app.locals.schema.userSettings.userId.eq(adminUser.id));
+    
+    const settingsMap = {};
+    emailSettings.forEach(setting => {
+      settingsMap[setting.key] = setting.value;
+    });
+    
+    const emailConfig = {
+      apiKey: settingsMap.emailApiKey,
+      domain: settingsMap.emailDomain,
+      fromEmail: settingsMap.emailFromEmail,
+      isEnabled: settingsMap.emailIsEnabled === 'true'
+    };
+    
+    if (!emailConfig.isEnabled || !emailConfig.apiKey || !emailConfig.domain || !emailConfig.fromEmail) {
+      return res.status(400).json({ error: 'Email service not configured. Please contact your administrator.' });
+    }
+    
+    // Check if user exists
+    const users = await req.app.locals.db.select().from(req.app.locals.schema.users).where(req.app.locals.schema.users.email.eq(email));
+    
+    if (users.length === 0) {
+      // Don't reveal if user exists or not for security
+      return res.json({ success: true, message: 'If an account with that email exists, a password reset link has been sent.' });
+    }
+    
+    const user = users[0];
+    
+    // Generate password reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+    
+    // Store reset token in database (you'll need to add these columns to users table)
+    await req.app.locals.db.update(req.app.locals.schema.users)
+      .set({ 
+        resetToken: resetToken,
+        resetTokenExpiry: resetExpiry 
+      })
+      .where(req.app.locals.schema.users.id.eq(user.id));
+    
+    // Create reset link
+    const resetLink = `${req.headers.origin || 'https://seoblog.placetools.ai'}/reset-password?token=${resetToken}`;
+    
+    // Send email
+    const resetEmailData = {
+      userEmail: email,
+      resetLink: resetLink,
+      companyName: 'PLACE',
+      emailConfig: emailConfig
+    };
+    
+    req.body = resetEmailData;
+    return await sendPasswordResetHandler(req, res);
+    
+  } catch (error) {
+    console.error('Failed to send password reset email:', error);
+    res.status(500).json({ 
+      error: 'Failed to send password reset email', 
+      details: error.message 
+    });
+  }
+});
 
 export default router;

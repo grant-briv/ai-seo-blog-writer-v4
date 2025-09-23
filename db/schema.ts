@@ -8,6 +8,8 @@ export const users = pgTable('users', {
   role: text('role').notNull(), // 'admin' | 'general'
   assignedProfileIds: jsonb('assigned_profile_ids').$type<string[]>().default([]),
   isTemporaryPassword: text('is_temporary_password').default('false'),
+  resetToken: text('reset_token'),
+  resetTokenExpiry: timestamp('reset_token_expiry'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

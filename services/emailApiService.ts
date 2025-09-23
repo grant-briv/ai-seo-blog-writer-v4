@@ -30,6 +30,10 @@ export interface EmailResponse {
   mailgunResponse?: any;
 }
 
+export interface PasswordResetRequest {
+  email: string;
+}
+
 export const emailApiService = {
   // Test email configuration
   async testEmail(data: TestEmailRequest): Promise<EmailResponse> {
@@ -125,6 +129,46 @@ export const emailApiService = {
       return {
         success: false,
         message: error.message || 'Failed to send invitation email'
+      };
+    }
+  },
+
+  // Send password reset email
+  async sendPasswordReset(data: PasswordResetRequest): Promise<EmailResponse> {
+    try {
+      console.log('📧 Sending password reset via API service');
+      
+      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      
+      const response = await fetch(`${baseUrl}/api/email/password-reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: data.email
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return {
+          success: false,
+          message: errorData.error || `HTTP ${response.status}`
+        };
+      }
+
+      const result = await response.json();
+      return {
+        success: true,
+        message: result.message || 'Password reset email sent successfully',
+        mailgunResponse: result.mailgunResponse
+      };
+    } catch (error: any) {
+      console.error('Email API password reset error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to send password reset email'
       };
     }
   }
