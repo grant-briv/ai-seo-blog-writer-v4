@@ -152,9 +152,12 @@ export const emailApiService = {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('❌ Password reset API error:', errorData);
         return {
           success: false,
-          message: errorData.error || `HTTP ${response.status}`
+          message: errorData.error || `HTTP ${response.status}`,
+          details: errorData.details,
+          step: errorData.step
         };
       }
 

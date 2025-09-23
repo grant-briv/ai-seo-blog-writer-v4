@@ -121,6 +121,11 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
       });
 
       setResetResult(result);
+      
+      // Log detailed error for debugging
+      if (!result.success) {
+        console.error('Password reset failed:', result);
+      }
     } catch (error: any) {
       console.error('Password reset error:', error);
       setResetResult({
