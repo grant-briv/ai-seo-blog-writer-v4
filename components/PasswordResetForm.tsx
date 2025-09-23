@@ -17,6 +17,7 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({ onResetComplete }
   const [userEmail, setUserEmail] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [passwordResetComplete, setPasswordResetComplete] = useState(false);
 
   useEffect(() => {
     const urlToken = searchParams.get('token');
@@ -47,7 +48,7 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({ onResetComplete }
         const result = await response.json();
         setIsValidToken(true);
         setUserEmail(result.email);
-        setMessage(result.message);
+        // Don't set message here - we only want to show it after password reset completion
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'Invalid or expired reset token');
@@ -96,6 +97,7 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({ onResetComplete }
       if (response.ok) {
         const result = await response.json();
         setMessage(result.message);
+        setPasswordResetComplete(true);
         
         // Redirect to login after successful reset
         setTimeout(() => {
@@ -163,7 +165,7 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({ onResetComplete }
     );
   }
 
-  if (message && !error && !newPassword) {
+  if (passwordResetComplete && message && !error) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
