@@ -6,6 +6,15 @@ import { users, userSettings } from '../../db/schema.ts';
 
 const router = express.Router();
 
+// Test endpoint to verify email routes work without auth
+router.get('/status', (req, res) => {
+  res.json({ 
+    status: 'Email routes active', 
+    timestamp: new Date().toISOString(),
+    routes: ['GET /status', 'POST /password-reset', 'POST /test', 'POST /send-invitation']
+  });
+});
+
 // Shared invitation handler for reuse
 const sendInvitationHandler = async (req, res) => {
   const { userEmail, inviterName, tempPassword, loginUrl, companyName, emailConfig } = req.body;
