@@ -136,7 +136,7 @@ const KeywordsEverywhereConfig: React.FC<KeywordsEverywhereConfigProps> = ({ con
                 type="button"
                 onClick={testConnection}
                 disabled={isTestingConnection || !localConfig.apiKey}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 btn btn-primary text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isTestingConnection ? 'Testing...' : 'Test Connection'}
               </button>

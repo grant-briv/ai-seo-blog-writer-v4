@@ -102,7 +102,7 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({
 
   return (
     <div className="space-y-6">
-      <SectionCard title="Change Your Password" icon={<KeyIcon className="w-6 h-6 text-blue-600" />}>
+      <SectionCard title="Change Your Password" icon={<KeyIcon className="w-6 h-6 text-place-teal" />}>
         <form onSubmit={handleChangePassword} className="space-y-4">
           <TextInput
             label="Current Password"
@@ -154,7 +154,7 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({
           )}
           <Button 
             type="submit" 
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            className="w-full btn btn-primary"
             disabled={!currentPassword || !newPassword || !confirmPassword}
           >
             Change Password
@@ -163,7 +163,7 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({
       </SectionCard>
 
       {currentUser.role === 'admin' && (
-        <SectionCard title="Admin: Direct Password Reset" icon={<KeyIcon className="w-6 h-6 text-red-600" />}>
+        <SectionCard title="Admin: Direct Password Reset" icon={<KeyIcon className="w-6 h-6 text-place-teal" />}>
           <div className="bg-blue-50 border border-blue-300 text-blue-800 px-4 py-3 rounded-lg mb-4 text-sm">
             <p><strong>Admin Function:</strong> Directly reset user passwords without requiring their current password.</p>
           </div>
@@ -218,7 +218,7 @@ export const PasswordManager: React.FC<PasswordManagerProps> = ({
             />
             <Button 
               type="submit" 
-              className="w-full bg-red-600 hover:bg-red-700 text-white"
+              className="w-full btn btn-primary"
               disabled={!resetUsername || !adminResetPasswordValue || !adminResetConfirm}
             >
               Reset User Password

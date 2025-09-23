@@ -17,6 +17,7 @@ import writerProfileRoutes from './routes/writerProfiles.js';
 import userSettingsRoutes from './routes/userSettings.js';
 import savedBlogsRoutes from './routes/savedBlogs.js';
 import topicSearchesRoutes from './routes/topicSearches.js';
+import emailRoutes from './routes/email.js';
 import { authenticateToken } from './middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -116,6 +117,7 @@ app.use('/api/writer-profiles', authenticateToken, writerProfileRoutes);
 app.use('/api/user-settings', authenticateToken, userSettingsRoutes);
 app.use('/api/saved-blogs', authenticateToken, savedBlogsRoutes);
 app.use('/api/topic-searches', authenticateToken, topicSearchesRoutes);
+app.use('/api/email', authenticateToken, emailRoutes);
 
 // Serve static frontend files in production
 if (process.env.NODE_ENV === 'production') {

@@ -52,7 +52,7 @@ export const SavedBlogsManager: React.FC<SavedBlogsManagerProps> = ({ currentUse
                         <p className="text-sm text-gray-500">Saved on: {new Date(blog.savedAt).toLocaleString()}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
-                        <Button onClick={() => onLoadBlog(blog)} className="bg-sky-600 hover:bg-sky-700 text-white !py-1.5 !px-3">
+                        <Button onClick={() => onLoadBlog(blog)} className="btn btn-primary !py-1.5 !px-3">
                             Load
                         </Button>
                         <Button onClick={() => handleDelete(blog.id, blog.blogTitle)} variant="danger" className="!py-1.5 !px-3">

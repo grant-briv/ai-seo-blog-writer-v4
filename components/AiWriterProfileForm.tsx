@@ -302,7 +302,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
                   placeholder="Paste a list of your website's URLs here, with each URL on a new line. These will be analyzed to provide context for internal linking."
                   rows={8}
                 />
-                <Button type="button" onClick={handleProcessUrls} disabled={isGeneratingContext} className="bg-sky-500 hover:bg-sky-600 text-white w-full sm:w-auto">
+                <Button type="button" onClick={handleProcessUrls} disabled={isGeneratingContext} className="btn btn-primary w-full sm:w-auto">
                     Process URL List
                 </Button>
               </div>
@@ -336,7 +336,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
                       </div>
                       <p className="text-xs text-gray-500">{selectedPageCount} of {sitemapPages.length} pages selected.</p>
                       
-                      <Button type="button" onClick={handleGenerateContext} disabled={isGeneratingContext || selectedPageCount === 0} className="w-full bg-teal-500 hover:bg-teal-600 text-white">
+                      <Button type="button" onClick={handleGenerateContext} disabled={isGeneratingContext || selectedPageCount === 0} className="w-full btn btn-primary">
                           <SparklesIcon className="w-5 h-5 mr-2" />
                           {isGeneratingContext ? 'Generating Summaries...' : `Generate Context from ${selectedPageCount} Selected URLs`}
                       </Button>
@@ -359,7 +359,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
           </div>
       </SectionCard>
 
-      <SectionCard title="Blog URL Configuration" icon={<GlobeAltIcon className="w-6 h-6 text-green-600"/>} startOpen={false}>
+      <SectionCard title="Blog URL Configuration" icon={<GlobeAltIcon className="w-6 h-6 text-place-teal"/>} startOpen={false}>
         <div className="space-y-4">
           <p className="text-sm text-gray-600">Configure the base URL for your blog posts. This will be used to auto-populate the Blog Post Base URL field when generating content.</p>
           
@@ -445,7 +445,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       <div className="flex space-x-4 pt-4">
         <Button 
           type="submit" 
-          className="bg-green-500 hover:bg-green-600 text-white flex-1" 
+          className="btn btn-primary flex-1" 
           disabled={knowledgeBaseOverLimit || imagePromptOverLimit || isGeneratingContext}
           aria-live="polite"
         >

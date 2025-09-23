@@ -17,10 +17,10 @@ export const SectionCard: React.FC<SectionCardProps> = ({ title, icon, children,
   return (
     <div className={`bg-white shadow-lg rounded-lg border border-gray-200 ${className}`}>
       {/* Header */}
-      <h2 className="text-xl font-semibold text-sky-700">
+      <h2 className="text-xl font-semibold">
         <button
           type="button"
-          className="flex items-center justify-between w-full p-6 text-left"
+          className="flex items-center justify-between w-full p-6 text-left bg-black text-white hover:bg-gray-800 transition-colors duration-200 rounded-t-lg"
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
           aria-controls={contentId}
@@ -30,7 +30,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({ title, icon, children,
             {title}
           </span>
           <ChevronDownIcon
-            className={`w-5 h-5 text-gray-500 transition-transform duration-300 transform ${isOpen ? 'rotate-180' : ''}`}
+            className={`w-5 h-5 text-white transition-transform duration-300 transform ${isOpen ? 'rotate-180' : ''}`}
           />
         </button>
       </h2>

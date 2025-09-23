@@ -87,7 +87,7 @@ export const ContentEnhancementUI: React.FC<ContentEnhancementUIProps> = ({
           <Button
             onClick={handleAnalyze}
             disabled={isAnalyzing}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+            className="w-full btn btn-primary"
           >
             {isAnalyzing ? 'Analyzing Content...' : 'Analyze Writing Quality'}
           </Button>

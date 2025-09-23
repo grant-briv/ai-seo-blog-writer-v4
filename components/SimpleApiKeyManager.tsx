@@ -34,9 +34,9 @@ export const SimpleApiKeyManager: React.FC<SimpleApiKeyManagerProps> = ({ curren
 
   return (
     <div className="space-y-6">
-      <SectionCard title="API Key Configuration" icon={<KeyIcon className="w-6 h-6 text-green-600" />}>
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">
+      <SectionCard title="API Key Configuration" icon={<KeyIcon className="w-6 h-6 text-place-teal" />}>
+        <div className="mb-4 p-4 bg-teal-50 border border-place-teal rounded-lg">
+          <p className="text-sm text-teal-800">
             <strong>Environment Variables:</strong> API keys are configured via environment variables for security. 
             In production, set these in your Railway dashboard or deployment environment.
           </p>

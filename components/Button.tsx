@@ -16,7 +16,7 @@ export const Button: React.FC<ButtonProps> = ({ children, variant = 'primary', c
       variantStyle = "bg-gray-200 hover:bg-gray-300 text-gray-700 focus:ring-gray-400 border border-gray-300";
       break;
     case 'danger':
-      variantStyle = "bg-red-500 hover:bg-red-600 text-white focus:ring-red-500";
+      variantStyle = "bg-gray-600 hover:bg-gray-700 text-white focus:ring-gray-500";
       break;
     case 'primary':
     default:

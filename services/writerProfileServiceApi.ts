@@ -125,14 +125,14 @@ export class WriterProfileServiceApi {
           if (updateError.message.includes('not found') || updateError.message.includes('404')) {
             console.log('📝 WriterProfileServiceApi: Profile not found in backend, creating new profile');
             // Create new profile without the old ID
-            const { id, ownerId, createdAt, updatedAt, ...profileData } = profile;
+            const { id, ownerId, ...profileData } = profile;
             return await this.createWriterProfile(profileData);
           }
           throw updateError;
         }
       } else {
         // Create new profile
-        const { id, ownerId, createdAt, updatedAt, ...profileData } = profile;
+        const { id, ownerId, ...profileData } = profile;
         return await this.createWriterProfile(profileData);
       }
     } catch (error) {

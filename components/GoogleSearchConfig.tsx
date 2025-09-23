@@ -181,7 +181,7 @@ const GoogleSearchConfig: React.FC<GoogleSearchConfigProps> = ({ config, onConfi
             <button
               type="button"
               onClick={handleSaveCredentials}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+              className="px-4 py-2 btn btn-primary text-sm font-medium"
             >
               Save Configuration
             </button>
@@ -210,7 +210,7 @@ const GoogleSearchConfig: React.FC<GoogleSearchConfigProps> = ({ config, onConfi
                   type="button"
                   onClick={handleTestConnection}
                   disabled={isTestingConnection}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-green-400 text-sm font-medium"
+                  className="px-4 py-2 btn btn-primary text-sm font-medium"
                 >
                   {isTestingConnection ? 'Testing...' : 'Test'}
                 </button>

@@ -258,8 +258,7 @@ export const KeywordResearch: React.FC<KeywordResearchProps> = ({ profileData, o
                   <td className="px-4 py-3">
                     <Button
                       onClick={() => handleKeywordSelect(keyword)}
-                      variant={selectedKeywords.has(keyword.keyword) ? 'primary' : 'secondary'}
-                      className="text-xs px-3 py-1"
+                      className={`text-xs px-3 py-1 ${selectedKeywords.has(keyword.keyword) ? 'btn btn-primary' : 'btn btn-secondary'}`}
                     >
                       {selectedKeywords.has(keyword.keyword) ? 'Selected' : 'Select'}
                     </Button>
@@ -323,11 +322,12 @@ export const KeywordResearch: React.FC<KeywordResearchProps> = ({ profileData, o
                 <option value="IT">Italy</option>
               </select>
             </div>
-            <div className="flex items-end">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
               <Button
                 onClick={performKeywordResearch}
                 disabled={isResearching || !seedKeyword.trim()}
-                className="w-full"
+                className="w-full btn btn-primary h-[42px]"
               >
                 <SearchIcon className="w-4 h-4 mr-2" />
                 {isResearching ? 'Researching...' : 'Research'}
@@ -400,7 +400,7 @@ export const KeywordResearch: React.FC<KeywordResearchProps> = ({ profileData, o
               <KeywordTable 
                 keywords={researchResults.questions} 
                 title="Question Keywords" 
-                icon={<TrendingUpIcon className="w-5 h-5 text-green-600" />} 
+                icon={<TrendingUpIcon className="w-5 h-5 text-place-teal" />} 
               />
             )}
             

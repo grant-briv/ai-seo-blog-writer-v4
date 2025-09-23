@@ -11,6 +11,7 @@ import { PasswordManager } from './PasswordManager';
 import EmailConfigComponent from './EmailConfig';
 import { emailService } from '../services/emailService';
 import type { EmailConfig } from '../services/emailService';
+import { UserSettingsApi } from '../services/userSettingsApi';
 
 interface AdminPageProps {
   profiles: AiWriterProfile[];
@@ -35,7 +36,7 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
     };
     loadUsers();
   }, []);
-  const [editingUser, setEditingUser] = useState<User | null | 'new'>(null);
+  const [editingUser, setEditingUser] = useState<User | null | 'new' | 'invite'>(null);
 
   const handleSaveUser = async (userToSave: User) => {
     try {
@@ -84,13 +85,13 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
     }
   };
 
-  const UserForm: React.FC<{ user: User | null; onSave: (user: User) => void; onCancel: () => void; }> = ({ user, onSave, onCancel }) => {
+  const UserForm: React.FC<{ user: User | null; onSave: (user: User) => void; onCancel: () => void; isInviteMode?: boolean; }> = ({ user, onSave, onCancel, isInviteMode = false }) => {
     const [username, setUsername] = useState(user?.username || '');
     const [email, setEmail] = useState(user?.email || '');
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<'admin' | 'general'>(user?.role || 'general');
     const [assignedProfileIds, setAssignedProfileIds] = useState<string[]>(user?.assignedProfileIds || []);
-    const [shouldSendInvite, setShouldSendInvite] = useState(false);
+    const [shouldSendInvite, setShouldInvite] = useState(isInviteMode);
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -105,13 +106,13 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
         return;
       }
       
-      if (shouldSendInvite && !email.trim()) {
+      if ((shouldSendInvite || isInviteMode) && !email.trim()) {
         setError("Email is required when sending invitations.");
         setIsLoading(false);
         return;
       }
       
-      if (!user && !password && !shouldSendInvite) {
+      if (!user && !password && !shouldSendInvite && !isInviteMode) {
         setError("Password is required for new users (or select 'Send Invitation').");
         setIsLoading(false);
         return;
@@ -159,7 +160,7 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
           let finalPassword = password;
           
           // If sending invite, generate temporary password
-          if (shouldSendInvite && emailService.isConfigured()) {
+          if ((shouldSendInvite || isInviteMode) && emailService.isConfigured()) {
             finalPassword = emailService.generateTempPassword();
             console.log('🔧 DEBUG: Generated temp password for invitation');
           }
@@ -181,17 +182,17 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
           console.log('🔧 DEBUG: User created successfully via API');
           
           // Update local state
-          const userForState = { ...newUser, isTemporaryPassword: shouldSendInvite };
+          const userForState = { ...newUser, isTemporaryPassword: shouldSendInvite || isInviteMode };
           setUsers([...users, userForState]);
           
           // Send invitation email if requested
-          if (shouldSendInvite && email.trim() && emailService.isConfigured()) {
+          if ((shouldSendInvite || isInviteMode) && email.trim() && emailService.isConfigured()) {
             const inviteResult = await emailService.sendInvitationEmail({
               userEmail: email.trim(),
               inviterName: 'Admin',
               tempPassword: finalPassword,
               loginUrl: window.location.origin,
-              companyName: 'AI SEO Blog Writer'
+              companyName: 'PLACE'
             });
             
             if (!inviteResult.success) {
@@ -215,19 +216,19 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
 
     return (
       <form onSubmit={handleSubmit} className="space-y-4 bg-gray-50 p-6 rounded-lg shadow-inner border">
-        <h4 className="text-lg font-semibold text-sky-800">{user ? `Edit ${user.username}` : 'Create New User'}</h4>
+        <h4 className="text-lg font-semibold text-sky-800">{user ? `Edit ${user.username}` : isInviteMode ? 'Invite New User' : 'Create New User'}</h4>
         {error && <p className="text-red-600 bg-red-100 p-2 rounded-md border border-red-300 text-sm" role="alert">{error}</p>}
         <TextInput label="Username" name="username" value={username} onChange={e => setUsername(e.target.value)} isRequired />
         <TextInput label="Email Address" name="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="user@example.com" />
         
         {/* Invitation option for new users */}
-        {!user && emailService.isConfigured() && (
+        {!user && emailService.isConfigured() && !isInviteMode && (
           <div>
             <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
               <input
                 type="checkbox"
                 checked={shouldSendInvite}
-                onChange={(e) => setShouldSendInvite(e.target.checked)}
+                onChange={(e) => setShouldInvite(e.target.checked)}
                 className="mr-2"
               />
               📧 Send invitation email (generates temporary password automatically)
@@ -235,15 +236,34 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
           </div>
         )}
         
+        {/* Show invitation notice in invite mode */}
+        {isInviteMode && (
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <UserGroupIcon className="h-5 w-5 text-blue-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">
+                  Invitation Mode
+                </h3>
+                <div className="mt-2 text-sm text-blue-700">
+                  <p>This user will receive an email invitation with login credentials. A temporary password will be generated automatically.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <TextInput 
-          label={`Password ${user ? '(leave blank to keep current)' : shouldSendInvite ? '(auto-generated)' : ''}`} 
+          label={`Password ${user ? '(leave blank to keep current)' : (shouldSendInvite || isInviteMode) ? '(auto-generated)' : ''}`} 
           name="password" 
           type="password" 
-          value={shouldSendInvite ? '' : password} 
+          value={(shouldSendInvite || isInviteMode) ? '' : password} 
           onChange={e => setPassword(e.target.value)} 
-          isRequired={!user && !shouldSendInvite}
-          disabled={shouldSendInvite}
-          placeholder={shouldSendInvite ? 'Temporary password will be generated and sent via email' : ''}
+          isRequired={!user && !shouldSendInvite && !isInviteMode}
+          disabled={shouldSendInvite || isInviteMode}
+          placeholder={(shouldSendInvite || isInviteMode) ? 'Temporary password will be generated and sent via email' : ''}
         />
         
         <div>
@@ -272,7 +292,7 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
         )}
 
         <div className="flex space-x-3 pt-2">
-          <Button type="submit" className="bg-sky-600 hover:bg-sky-700 text-white flex-1" disabled={isLoading}>
+          <Button type="submit" className="btn btn-primary flex-1" disabled={isLoading}>
             <SaveIcon className="w-5 h-5 mr-2" /> {isLoading ? 'Saving...' : 'Save User'}
           </Button>
           <Button type="button" onClick={onCancel} variant="secondary" className="flex-1">
@@ -285,19 +305,34 @@ const UserManagement: React.FC<{ allProfiles: AiWriterProfile[]; emailConfig?: E
   
   return (
     <div className="space-y-6">
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end gap-3 mb-4">
         {editingUser === null && (
-          <Button onClick={() => setEditingUser('new')} className="bg-sky-600 hover:bg-sky-700 text-white">
-            <PlusCircleIcon className="w-5 h-5 mr-2" /> Add New User
-          </Button>
+          <>
+            <Button onClick={() => setEditingUser('new')} className="btn btn-primary">
+              <PlusCircleIcon className="w-5 h-5 mr-2" /> Add New User
+            </Button>
+            <Button 
+              onClick={() => {
+                if (!emailService.isConfigured()) {
+                  alert('Please configure email service first in the Email Configuration tab');
+                  return;
+                }
+                setEditingUser('invite');
+              }} 
+              className="btn btn-secondary"
+            >
+              <UserGroupIcon className="w-5 h-5 mr-2" /> Invite User
+            </Button>
+          </>
         )}
       </div>
 
       {editingUser !== null && (
         <UserForm 
-          user={editingUser === 'new' ? null : editingUser} 
+          user={editingUser === 'new' || editingUser === 'invite' ? null : editingUser} 
           onSave={handleSaveUser} 
-          onCancel={() => setEditingUser(null)} 
+          onCancel={() => setEditingUser(null)}
+          isInviteMode={editingUser === 'invite'}
         />
       )}
 
@@ -344,12 +379,62 @@ export const AdminPage: React.FC<AdminPageProps> = ({ profiles, setCurrentView, 
   const [activeTab, setActiveTab] = useState<'users' | 'api' | 'password' | 'email'>('users');
   const [emailConfig, setEmailConfig] = useState<EmailConfig>();
 
+  // Load email config from user settings on component mount
+  useEffect(() => {
+    const loadEmailConfig = async () => {
+      try {
+        // Load each email setting individually
+        const [apiKey, domain, fromEmail, isEnabled] = await Promise.all([
+          UserSettingsApi.getUserSetting('emailApiKey'),
+          UserSettingsApi.getUserSetting('emailDomain'),
+          UserSettingsApi.getUserSetting('emailFromEmail'),
+          UserSettingsApi.getUserSetting('emailIsEnabled')
+        ]);
+
+        if (apiKey || domain || fromEmail) {
+          const config: EmailConfig = {
+            apiKey: apiKey || '',
+            domain: domain || '',
+            fromEmail: fromEmail || '',
+            isEnabled: isEnabled === 'true'
+          };
+          setEmailConfig(config);
+        }
+      } catch (error) {
+        console.error('Failed to load email config:', error);
+      }
+    };
+
+    loadEmailConfig();
+  }, []);
+
   // Initialize email service when config changes
   useEffect(() => {
     if (emailConfig) {
       emailService.configure(emailConfig);
     }
   }, [emailConfig]);
+
+  // Handle email config updates with persistence
+  const handleEmailConfigUpdate = async (newConfig: EmailConfig) => {
+    try {
+      // Save to PostgreSQL via user settings API
+      await Promise.all([
+        UserSettingsApi.setUserSetting('emailApiKey', newConfig.apiKey),
+        UserSettingsApi.setUserSetting('emailDomain', newConfig.domain),
+        UserSettingsApi.setUserSetting('emailFromEmail', newConfig.fromEmail),
+        UserSettingsApi.setUserSetting('emailIsEnabled', newConfig.isEnabled.toString())
+      ]);
+
+      // Update local state
+      setEmailConfig(newConfig);
+      
+      console.log('📧 Email configuration saved to PostgreSQL');
+    } catch (error) {
+      console.error('Failed to save email config:', error);
+      alert('Failed to save email configuration. Please try again.');
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -402,7 +487,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ profiles, setCurrentView, 
           <SectionCard title="Email Configuration" icon={<UserGroupIcon className="w-6 h-6 text-sky-600"/>}>
             <EmailConfigComponent 
               config={emailConfig} 
-              onConfigUpdate={setEmailConfig} 
+              onConfigUpdate={handleEmailConfigUpdate} 
             />
           </SectionCard>
         )}

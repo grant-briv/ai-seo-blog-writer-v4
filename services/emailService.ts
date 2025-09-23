@@ -3,9 +3,9 @@
 // You'll need to configure your email provider credentials
 
 export interface EmailConfig {
-  serviceId: string;
-  templateId: string;
-  publicKey: string;
+  apiKey: string;
+  domain: string;
+  fromEmail: string;
   isEnabled: boolean;
 }
 
@@ -34,39 +34,28 @@ class EmailService {
   }
 
   public isConfigured(): boolean {
-    return !!(this.config && this.config.isEnabled && this.config.serviceId && this.config.publicKey);
+    return !!(this.config && this.config.isEnabled && this.config.apiKey && this.config.domain && this.config.fromEmail);
   }
 
-  // Send user invitation email
+  // Send user invitation email via backend API
   public async sendInvitationEmail(data: InviteEmailData): Promise<{ success: boolean; message: string }> {
     if (!this.isConfigured()) {
       return { success: false, message: 'Email service not configured' };
     }
 
     try {
-      // Using EmailJS as an example - you can replace with your preferred service
-      const emailData = {
-        to_email: data.userEmail,
-        to_name: data.userEmail.split('@')[0], // Use email prefix as name
-        from_name: data.inviterName,
-        subject: `You've been invited to ${data.companyName || 'AI SEO Blog Writer'}`,
-        message: this.generateInviteEmailBody(data),
-        temp_password: data.tempPassword,
-        login_url: data.loginUrl,
-        company_name: data.companyName || 'AI SEO Blog Writer'
-      };
+      const { emailApiService } = await import('./emailApiService');
+      
+      const result = await emailApiService.sendInvitation({
+        userEmail: data.userEmail,
+        inviterName: data.inviterName,
+        tempPassword: data.tempPassword,
+        loginUrl: data.loginUrl,
+        companyName: data.companyName,
+        emailConfig: this.config!
+      });
 
-      // This would be replaced with your actual email service API call
-      // For example, with EmailJS:
-      // await emailjs.send(this.config.serviceId, this.config.templateId, emailData, this.config.publicKey);
-      
-      // For now, we'll simulate the email sending
-      console.log('📧 Invitation email would be sent:', emailData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      return { success: true, message: 'Invitation email sent successfully' };
+      return result;
     } catch (error) {
       console.error('Failed to send invitation email:', error);
       return { 
@@ -83,21 +72,39 @@ class EmailService {
     }
 
     try {
-      const emailData = {
-        to_email: data.userEmail,
-        to_name: data.userName,
-        subject: 'Password Reset Request',
-        message: this.generatePasswordResetEmailBody(data),
-        reset_url: data.resetUrl,
-        reset_token: data.resetToken,
-        company_name: data.companyName || 'AI SEO Blog Writer'
-      };
+      // Prepare form data for Mailgun API
+      const formData = new FormData();
+      formData.append('from', `PLACE Support <${this.config!.fromEmail}>`);
+      formData.append('to', data.userEmail);
+      formData.append('subject', 'Password Reset Request');
+      formData.append('text', this.generatePasswordResetEmailBody(data));
+      formData.append('html', this.generatePasswordResetEmailHTML(data));
 
-      // This would be replaced with your actual email service API call
-      console.log('📧 Password reset email would be sent:', emailData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Make actual Mailgun API call
+      const response = await fetch(`https://api.mailgun.net/v3/${this.config!.domain}/messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${btoa(`api:${this.config!.apiKey}`)}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Mailgun API error:', response.status, response.statusText, errorText);
+        console.error('Request details:', {
+          domain: this.config!.domain,
+          apiKeyPrefix: this.config!.apiKey.substring(0, 8) + '...',
+          url: `https://api.mailgun.net/v3/${this.config!.domain}/messages`
+        });
+        return { 
+          success: false, 
+          message: `Mailgun API error: ${response.status} ${response.statusText} - ${errorText}` 
+        };
+      }
+
+      const result = await response.json();
+      console.log('📧 Mailgun password reset email sent successfully:', result);
       
       return { success: true, message: 'Password reset email sent successfully' };
     } catch (error) {
@@ -111,7 +118,7 @@ class EmailService {
 
   private generateInviteEmailBody(data: InviteEmailData): string {
     return `
-You've been invited to join ${data.companyName || 'AI SEO Blog Writer'}!
+You've been invited to join ${data.companyName || 'PLACE'}!
 
 ${data.inviterName} has created an account for you. Here are your login details:
 
@@ -126,11 +133,55 @@ Welcome to the team!
     `.trim();
   }
 
+  private generateInviteEmailHTML(data: InviteEmailData): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Montserrat', Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #000; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .credentials { background: white; padding: 15px; border-left: 4px solid #59c4c4; margin: 20px 0; }
+        .button { display: inline-block; background: #59c4c4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Welcome to ${data.companyName || 'PLACE'}</h1>
+        </div>
+        <div class="content">
+            <p>Hi there!</p>
+            <p>${data.inviterName} has invited you to join <strong>${data.companyName || 'PLACE'}</strong>.</p>
+            
+            <div class="credentials">
+                <h3>Your Login Details:</h3>
+                <p><strong>Email:</strong> ${data.userEmail}</p>
+                <p><strong>Temporary Password:</strong> ${data.tempPassword}</p>
+            </div>
+            
+            <p>Please log in and change your password as soon as possible for security.</p>
+            
+            <p style="text-align: center;">
+                <a href="${data.loginUrl}" class="button">Login Now</a>
+            </p>
+            
+            <p>Welcome to the team!</p>
+        </div>
+    </div>
+</body>
+</html>
+    `.trim();
+  }
+
   private generatePasswordResetEmailBody(data: PasswordResetEmailData): string {
     return `
 Hi ${data.userName},
 
-You requested a password reset for your ${data.companyName || 'AI SEO Blog Writer'} account.
+You requested a password reset for your ${data.companyName || 'PLACE'} account.
 
 Click the link below to reset your password:
 ${data.resetUrl}
@@ -140,7 +191,49 @@ This link will expire in 24 hours for security reasons.
 If you didn't request this reset, please ignore this email.
 
 Best regards,
-${data.companyName || 'AI SEO Blog Writer'} Team
+${data.companyName || 'PLACE'} Team
+    `.trim();
+  }
+
+  private generatePasswordResetEmailHTML(data: PasswordResetEmailData): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Montserrat', Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #000; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background: #f9f9f9; }
+        .button { display: inline-block; background: #59c4c4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; margin: 20px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Password Reset Request</h1>
+        </div>
+        <div class="content">
+            <p>Hi ${data.userName},</p>
+            <p>You requested a password reset for your <strong>${data.companyName || 'PLACE'}</strong> account.</p>
+            
+            <p style="text-align: center;">
+                <a href="${data.resetUrl}" class="button">Reset My Password</a>
+            </p>
+            
+            <div class="warning">
+                <p><strong>⚠️ Security Notice:</strong> This link will expire in 24 hours for security reasons.</p>
+            </div>
+            
+            <p>If you didn't request this reset, please ignore this email and your password will remain unchanged.</p>
+            
+            <p>Best regards,<br>${data.companyName || 'PLACE'} Team</p>
+        </div>
+    </div>
+</body>
+</html>
     `.trim();
   }
 
@@ -181,8 +274,8 @@ export const emailService = new EmailService();
 
 // Email configuration component data
 export const DEFAULT_EMAIL_CONFIG: EmailConfig = {
-  serviceId: '',
-  templateId: '',
-  publicKey: '',
+  apiKey: '',
+  domain: '',
+  fromEmail: '',
   isEnabled: false
 };

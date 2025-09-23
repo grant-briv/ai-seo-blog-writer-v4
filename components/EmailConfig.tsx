@@ -8,9 +8,9 @@ interface EmailConfigProps {
 }
 
 const EmailConfigComponent: React.FC<EmailConfigProps> = ({ config, onConfigUpdate }) => {
-  const [serviceId, setServiceId] = useState(config?.serviceId || '');
-  const [templateId, setTemplateId] = useState(config?.templateId || '');
-  const [publicKey, setPublicKey] = useState(config?.publicKey || '');
+  const [apiKey, setApiKey] = useState(config?.apiKey || '');
+  const [domain, setDomain] = useState(config?.domain || '');
+  const [fromEmail, setFromEmail] = useState(config?.fromEmail || '');
   const [isEnabled, setIsEnabled] = useState(config?.isEnabled || false);
   const [showConfig, setShowConfig] = useState(false);
   const [testEmail, setTestEmail] = useState('');
@@ -20,35 +20,41 @@ const EmailConfigComponent: React.FC<EmailConfigProps> = ({ config, onConfigUpda
   // Update local state when config prop changes
   useEffect(() => {
     if (config) {
-      setServiceId(config.serviceId || '');
-      setTemplateId(config.templateId || '');
-      setPublicKey(config.publicKey || '');
+      setApiKey(config.apiKey || '');
+      setDomain(config.domain || '');
+      setFromEmail(config.fromEmail || '');
       setIsEnabled(config.isEnabled || false);
     }
   }, [config]);
 
-  const isConfigured = !!(config && config.serviceId && config.publicKey);
+  const isConfigured = !!(config && config.apiKey && config.domain && config.fromEmail);
 
-  const handleSaveCredentials = () => {
-    if (!serviceId.trim() || !publicKey.trim()) {
-      alert('Please enter both Service ID and Public Key');
+  const handleSaveCredentials = async () => {
+    if (!apiKey.trim() || !domain.trim() || !fromEmail.trim()) {
+      alert('Please enter API Key, Domain, and From Email');
       return;
     }
 
     const newConfig: EmailConfig = {
-      serviceId: serviceId.trim(),
-      templateId: templateId.trim(),
-      publicKey: publicKey.trim(),
+      apiKey: apiKey.trim(),
+      domain: domain.trim(),
+      fromEmail: fromEmail.trim(),
       isEnabled: isEnabled
     };
 
-    setShowConfig(false);
-    onConfigUpdate?.(newConfig);
-    
-    // Configure the email service
-    emailService.configure(newConfig);
-    
-    alert('Email service configured successfully!');
+    try {
+      // Configure the email service
+      emailService.configure(newConfig);
+      
+      // Save to database via parent component
+      await onConfigUpdate?.(newConfig);
+      
+      setShowConfig(false);
+      alert('Email service configured and saved successfully!');
+    } catch (error) {
+      console.error('Failed to save email configuration:', error);
+      alert('Failed to save email configuration. Please try again.');
+    }
   };
 
   const handleTestEmail = async () => {
@@ -57,7 +63,7 @@ const EmailConfigComponent: React.FC<EmailConfigProps> = ({ config, onConfigUpda
       return;
     }
 
-    if (!serviceId.trim() || !publicKey.trim()) {
+    if (!apiKey.trim() || !domain.trim() || !fromEmail.trim()) {
       setTestResult({ success: false, message: 'Please configure email service first' });
       return;
     }
@@ -67,20 +73,18 @@ const EmailConfigComponent: React.FC<EmailConfigProps> = ({ config, onConfigUpda
 
     try {
       const testConfig: EmailConfig = {
-        serviceId: serviceId.trim(),
-        templateId: templateId.trim(),
-        publicKey: publicKey.trim(),
+        apiKey: apiKey.trim(),
+        domain: domain.trim(),
+        fromEmail: fromEmail.trim(),
         isEnabled: true
       };
 
-      emailService.configure(testConfig);
-
-      const result = await emailService.sendInvitationEmail({
-        userEmail: testEmail,
-        inviterName: 'Test Admin',
-        tempPassword: 'TestPass123',
-        loginUrl: window.location.origin,
-        companyName: 'AI SEO Blog Writer (Test)'
+      // Use the new email API service
+      const { emailApiService } = await import('../services/emailApiService');
+      
+      const result = await emailApiService.testEmail({
+        testEmail: testEmail.trim(),
+        emailConfig: testConfig
       });
 
       setTestResult(result);
@@ -138,39 +142,39 @@ const EmailConfigComponent: React.FC<EmailConfigProps> = ({ config, onConfigUpda
           
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Service ID
-            </label>
-            <input
-              type="text"
-              value={serviceId}
-              onChange={(e) => setServiceId(e.target.value)}
-              placeholder="Enter your email service ID (e.g., EmailJS Service ID)"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Template ID (Optional)
-            </label>
-            <input
-              type="text"
-              value={templateId}
-              onChange={(e) => setTemplateId(e.target.value)}
-              placeholder="Enter your email template ID"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Public Key
+              Mailgun API Key
             </label>
             <input
               type="password"
-              value={publicKey}
-              onChange={(e) => setPublicKey(e.target.value)}
-              placeholder="Enter your public key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Enter your Mailgun API key"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Mailgun Domain
+            </label>
+            <input
+              type="text"
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              placeholder="Enter your Mailgun domain (e.g., mg.yourdomain.com)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              From Email Address
+            </label>
+            <input
+              type="email"
+              value={fromEmail}
+              onChange={(e) => setFromEmail(e.target.value)}
+              placeholder="Enter sender email address (e.g., noreply@yourdomain.com)"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -179,7 +183,7 @@ const EmailConfigComponent: React.FC<EmailConfigProps> = ({ config, onConfigUpda
             <button
               type="button"
               onClick={handleSaveCredentials}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+              className="px-4 py-2 btn btn-primary text-sm font-medium"
             >
               Save Configuration
             </button>
@@ -208,7 +212,7 @@ const EmailConfigComponent: React.FC<EmailConfigProps> = ({ config, onConfigUpda
                   type="button"
                   onClick={handleTestEmail}
                   disabled={isTestingEmail}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-green-400 text-sm font-medium"
+                  className="px-4 py-2 btn btn-primary text-sm font-medium"
                 >
                   {isTestingEmail ? 'Sending...' : 'Test'}
                 </button>
@@ -242,15 +246,15 @@ const EmailConfigComponent: React.FC<EmailConfigProps> = ({ config, onConfigUpda
                 Email Setup Required
               </h3>
               <div className="mt-2 text-sm text-blue-700">
-                <p>To enable user invitations and password resets, configure an email service:</p>
+                <p>To enable user invitations and password resets, configure Mailgun:</p>
                 <ol className="list-decimal list-inside mt-2 space-y-1">
-                  <li>Sign up for an email service (EmailJS, SendGrid, etc.)</li>
-                  <li>Get your Service ID and Public Key</li>
+                  <li>Sign up for a Mailgun account</li>
+                  <li>Get your API Key and Domain from Mailgun dashboard</li>
                   <li>Configure the credentials above</li>
                   <li>Test the connection</li>
                 </ol>
                 <p className="mt-2 text-xs">
-                  Popular services: EmailJS (free tier), SendGrid, Mailgun, AWS SES
+                  Mailgun provides reliable email delivery with detailed analytics
                 </p>
               </div>
             </div>

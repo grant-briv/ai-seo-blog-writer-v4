@@ -266,7 +266,7 @@ export const TopicFinder: React.FC<TopicFinderProps> = ({ onSetDeepResearchInfo,
                     />
                 </div>
                 <div className="flex w-full sm:w-auto space-x-2 flex-shrink-0">
-                    <Button type="submit" disabled={isLoading} className="bg-sky-600 hover:bg-sky-700 text-white flex-1 sm:flex-initial">
+                    <Button type="submit" disabled={isLoading} className="btn btn-primary flex-1 sm:flex-initial">
                         <SearchCircleIcon className="w-5 h-5 mr-2" />
                         Search
                     </Button>

@@ -106,7 +106,7 @@ export const WriterProfileManager: React.FC<WriterProfileManagerProps> = ({ prof
               <div className="space-y-4">
                 <Button
                   onClick={() => setEditingProfile('new')}
-                  className="bg-green-500 hover:bg-green-600 text-white w-full sm:w-auto"
+                  className="btn btn-primary w-full sm:w-auto"
                 >
                   <PlusCircleIcon className="w-5 h-5 mr-2" /> Create New Profile
                 </Button>

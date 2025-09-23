@@ -100,13 +100,13 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
 
   if (showForgotPassword) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 font-montserrat">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 space-y-6">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-sky-600 mb-4">Password Reset</h1>
+            <h1 className="text-3xl font-bold text-place-teal mb-4">Password Reset</h1>
             <p className="text-gray-600">Contact your system administrator to reset your password</p>
           </div>
-          <div className="bg-blue-50 border border-blue-300 text-blue-800 px-4 py-3 rounded-lg text-sm" role="alert">
+          <div className="bg-teal-50 border border-place-teal text-teal-800 px-4 py-3 rounded-lg text-sm" role="alert">
             <p><strong>For Security:</strong> Password resets must be performed by an administrator.</p>
             <p className="mt-2">Please contact your system administrator with:</p>
             <ul className="mt-2 ml-4 list-disc text-xs">
@@ -125,7 +125,7 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
             <Button 
               type="button" 
               onClick={() => setShowForgotPassword(false)} 
-              className="w-full bg-sky-600 hover:bg-sky-700 text-white"
+              className="w-full btn btn-primary"
             >
               Back to Login
             </Button>
@@ -136,17 +136,17 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 font-montserrat">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 space-y-6">
         <div className="text-center">
           <div className="text-center mb-4">
-            <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-600 to-cyan-500">
-              AI SEO Blog Writer
+            <h1 className="text-3xl font-bold text-gray-900">
+              PLACE
             </h1>
           </div>
           <p className="text-gray-600">Please sign in to continue</p>
         </div>
-        <div className="bg-green-50 border border-green-300 text-green-800 px-4 py-3 rounded-lg text-sm" role="alert">
+        <div className="bg-teal-50 border border-place-teal text-teal-800 px-4 py-3 rounded-lg text-sm" role="alert">
           <p><strong className="font-bold">Production Authentication:</strong> Uses bcrypt password hashing and secure session management.</p>
           <p className="mt-1">Default Admin: <code>admin</code> / <code>SecureAdmin123!</code></p>
           <p className="mt-1 text-xs"><strong>Important:</strong> Change the default password after first login.</p>
@@ -170,7 +170,7 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
             isRequired
           />
           {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-          <Button type="submit" className="w-full bg-sky-600 hover:bg-sky-700 text-white text-base">
+          <Button type="submit" className="w-full btn btn-primary text-base">
             Sign In
           </Button>
         </form>
@@ -178,7 +178,7 @@ const LoginPage: React.FC<{ onLogin: (user: User) => void; }> = ({ onLogin }) =>
           <button
             type="button"
             onClick={() => setShowForgotPassword(true)}
-            className="text-sm text-sky-600 hover:text-sky-800 underline"
+            className="text-sm text-place-teal hover:text-place-teal-dark underline"
           >
             Forgot your password?
           </button>
@@ -1196,8 +1196,8 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
   const TabButton: React.FC<{ tabId: typeof activeTab; icon: React.ReactNode; label: string; onClick: () => void }> = ({ tabId, icon, label, onClick }) => (
     <button
       onClick={onClick}
-      className={`flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 transition-colors
-        ${activeTab === tabId ? 'bg-sky-600 text-white shadow' : 'text-gray-600 hover:bg-gray-200 hover:text-gray-800'}`}
+      className={`flex items-center space-x-2 px-4 py-2 text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors
+        ${activeTab === tabId ? 'bg-white text-black font-bold border-2 border-gray-300 shadow' : 'text-gray-600 font-medium hover:bg-gray-200 hover:text-gray-800'}`}
     >
       {icon}
       <span>{label}</span>
@@ -1205,14 +1205,14 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 p-4 md:p-8 font-sans">
+    <div className="min-h-screen bg-gray-50 text-gray-800 p-4 md:p-8 font-montserrat">
       <header className="mb-6 text-center relative">
         <div className="text-center mb-2">
-          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-600 to-cyan-500">
-            AI SEO Blog Writer
+          <h1 className="text-4xl font-bold text-gray-900">
+            PLACE
           </h1>
         </div>
-        <p className="text-lg text-gray-600">Your complete content creation toolkit.</p>
+        <p className="text-lg text-gray-600 font-roboto">Modern real estate technology platform.</p>
         <div className="absolute top-0 right-0 flex items-center space-x-4">
             <div className="text-right">
                 <p className="text-sm text-gray-700">Welcome, <strong className="font-semibold">{currentUser.username}</strong></p>
@@ -1220,7 +1220,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             </div>
             <Button 
                 onClick={() => setCurrentView('admin')} 
-                className="text-sky-700 bg-white border border-sky-600 hover:bg-sky-50 !p-2"
+                className="btn btn-outline !p-2"
                 aria-label="Open Settings"
             >
                 <CogIcon className="w-6 h-6" />
@@ -1254,7 +1254,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
       {activeTab === 'write' && (
         <div className="space-y-6 max-w-4xl mx-auto">
-          <SectionCard title="SEO & Post Settings" icon={<LightBulbIcon className="w-6 h-6 text-yellow-500"/>}>
+          <SectionCard title="SEO & Post Settings" icon={<LightBulbIcon className="w-6 h-6 text-place-teal"/>}>
             <WriterProfileSelector
               profiles={visibleWriterProfiles}
               selectedProfileId={selectedWriterProfileId}
@@ -1273,7 +1273,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
               <Button
                 onClick={handleGenerateHeadline}
                 disabled={anyLoading || !mainContent}
-                className="w-full text-sm py-2 bg-pink-500 hover:bg-pink-600 text-white"
+                className="w-full text-sm py-2 btn btn-primary"
                 aria-label={!mainContent ? "Generate post content first to improve headline" : "Improve Headline with AI"}
               >
                 <SparklesIcon className="w-5 h-5 mr-2" />
@@ -1294,7 +1294,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
               <Button
                 onClick={handleEstimateKeywordVolume}
                 disabled={anyLoading || !seoSettings.focusKeywords.trim()}
-                className="w-full text-sm py-2 bg-teal-500 hover:bg-teal-600 text-white"
+                className="w-full text-sm py-2 btn btn-primary"
                 variant="primary"
                 aria-label={!seoSettings.focusKeywords.trim() ? "Enter focus keywords to estimate volume" : "Estimate Volume & Get Keyword Suggestions"}
               >
@@ -1303,8 +1303,8 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             </div>
             {keywordAnalysisResult && (
                 <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <h3 className="text-md font-semibold text-sky-700 mb-3 flex items-center">
-                        <TrendingUpIcon className="w-5 h-5 mr-2 text-teal-600" />
+                    <h3 className="text-md font-semibold text-place-teal mb-3 flex items-center">
+                        <TrendingUpIcon className="w-5 h-5 mr-2 text-place-teal" />
                         Keyword Estimation & Suggestions
                     </h3>
                     <div className="space-y-4 text-sm">
@@ -1316,7 +1316,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                                     <div key={`analyzed-${index}`} className="p-2 bg-gray-50 border border-gray-100 rounded-md">
                                         <div className="text-gray-700">
                                             <strong className="text-gray-900">{item.keyword}</strong>:
-                                            Est. Volume: <span className="font-medium text-teal-600">{item.estimatedVolume}</span>
+                                            Est. Volume: <span className="font-medium text-place-teal">{item.estimatedVolume}</span>
                                         </div>
                                         {item.notes && (
                                             <p className="text-xs text-gray-500 italic mt-1">{item.notes}</p>
@@ -1328,16 +1328,16 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                         </div>
                         <div className="mt-3">
                             <h4 className="font-semibold text-gray-800 mb-2">Suggested Alternative Keywords:</h4>
-                            <p className="text-xs text-sky-600 mb-3"><strong>Tip:</strong> Click "Replace" to swap your primary keyword, or "Add" to include it in your focus keywords list.</p>
+                            <p className="text-xs text-place-teal mb-3"><strong>Tip:</strong> Click "Replace" to swap your primary keyword, or "Add" to include it in your focus keywords list.</p>
                             {keywordAnalysisResult.suggestedKeywords.length > 0 ? (
                                 <div className="space-y-3">
                                 {keywordAnalysisResult.suggestedKeywords.map((item, index) => (
-                                    <div key={`suggested-${index}`} className="p-3 bg-white border border-gray-200 rounded-lg hover:border-teal-300 transition-colors">
+                                    <div key={`suggested-${index}`} className="p-3 bg-white border border-gray-200 rounded-lg hover:border-place-teal transition-colors">
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="flex-grow">
                                                 <div className="text-gray-700">
                                                     <strong className="text-gray-900">{item.keyword}</strong>:
-                                                    Est. Volume: <span className="font-medium text-teal-600">{item.estimatedVolume}</span>
+                                                    Est. Volume: <span className="font-medium text-place-teal">{item.estimatedVolume}</span>
                                                 </div>
                                                 {item.reason && (
                                                     <p className="text-xs text-gray-500 italic mt-1">{item.reason}</p>
@@ -1346,14 +1346,14 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                                             <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
                                                 <Button
                                                     onClick={() => handleReplaceKeyword(item.keyword, false)}
-                                                    className="!py-1 !px-2 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+                                                    className="!py-1 !px-2 text-xs btn btn-primary"
                                                     title="Replace primary focus keyword"
                                                 >
                                                     Replace
                                                 </Button>
                                                 <Button
                                                     onClick={() => handleReplaceKeyword(item.keyword, true)}
-                                                    className="!py-1 !px-2 text-xs bg-sky-600 hover:bg-sky-700 text-white"
+                                                    className="!py-1 !px-2 text-xs btn btn-primary"
                                                     title="Add to focus keywords list"
                                                 >
                                                     Add
@@ -1379,7 +1379,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             )}
           </SectionCard>
 
-          <SectionCard title="Content Inputs" icon={<DocumentTextIcon className="w-6 h-6 text-green-600"/>}>
+          <SectionCard title="Content Inputs" icon={<DocumentTextIcon className="w-6 h-6 text-place-teal"/>}>
             <div className="flex flex-col sm:flex-row sm:space-x-4">
               <div className="flex-1">
                 <TextInput
@@ -1426,14 +1426,14 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
               <Button 
                 onClick={handleGeneratePost} 
                 disabled={anyLoading || !seoSettings.title || !seoSettings.focusKeywords || !selectedWriterProfileId} 
-                className="w-full text-white bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600"
+                className="w-full btn btn-primary"
               >
                 <SparklesIcon className="w-5 h-5 mr-2"/> {isLoading ? 'Generating Post...' : 'Generate Draft Blog Post'}
               </Button>
             </div>
           </SectionCard>
           
-          <SectionCard title="Blog Content Editor" icon={<SparklesIcon className="w-6 h-6 text-pink-600"/>}>
+          <SectionCard title="Blog Content Editor" icon={<SparklesIcon className="w-6 h-6 text-place-teal"/>}>
             <TextAreaInput
               label="Main Blog Post Content (HTML)"
               name="mainContent"
@@ -1447,12 +1447,12 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
               <div className="mt-2 p-3 bg-gray-100 rounded-md border border-gray-200 text-sm text-gray-700">
                 <div className="flex flex-wrap items-center space-x-4">
                     <div className="flex items-center">
-                        <ChartBarIcon className="w-5 h-5 text-teal-600 flex-shrink-0 mr-1.5" />
+                        <ChartBarIcon className="w-5 h-5 text-place-teal flex-shrink-0 mr-1.5" />
                         <span>Word Count: <strong className="text-gray-900">{wordCount}</strong></span>
                     </div>
                     {keywordDensity && (
                     <div className="flex items-center">
-                        <span className="hidden sm:inline ml-2 mr-1 text-teal-600">&#8226;</span>
+                        <span className="hidden sm:inline ml-2 mr-1 text-place-teal">&#8226;</span>
                         <span>
                         Density ({keywordDensity.keyword}): <strong className="text-gray-900">{keywordDensity.density}</strong>
                         </span>
@@ -1463,7 +1463,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                   <Button
                     onClick={handleImproveKeywordDensity}
                     disabled={anyLoading}
-                    className="w-full mt-3 text-sm py-2 bg-orange-500 hover:bg-orange-600 text-white"
+                    className="w-full mt-3 text-sm py-2 btn btn-secondary"
                     aria-label="Improve keyword density to approximately 1%"
                   >
                     <ArrowUpCircleIcon className="w-5 h-5 mr-2"/>
@@ -1477,7 +1477,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                     <Button
                         onClick={handleSaveBlog}
                         disabled={anyLoading || (!mainContent && !seoSettings.title)}
-                        className="w-full mb-2 bg-sky-500 hover:bg-sky-600 text-white"
+                        className="w-full mb-2 btn btn-primary"
                     >
                         <BookmarkSquareIcon className="w-5 h-5 mr-2"/> {savedBlogId ? 'Update Saved Blog' : 'Save Blog'}
                     </Button>
@@ -1493,7 +1493,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                         <Button
                             onClick={handleCopyToGoogleDocs}
                             disabled={!mainContent || approvalStatus !== 'approved'}
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                            className="flex-1 btn btn-primary"
                             aria-label={approvalStatus !== 'approved' ? "Content must be approved by manager to copy for Google Docs" : "Copy for Google Docs"}
                         >
                             <DocumentDuplicateIcon className="w-5 h-5 mr-2"/> Copy for GDocs
@@ -1506,12 +1506,12 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             </div>
           </SectionCard>
           
-          <SectionCard title="Meta & SEO Details" icon={<SearchCircleIcon className="w-6 h-6 text-purple-600"/>}>
+          <SectionCard title="Meta & SEO Details" icon={<SearchCircleIcon className="w-6 h-6 text-place-teal"/>}>
             <div className="mb-4">
               <Button
                 onClick={handleGenerateMeta}
                 disabled={anyLoading || !mainContent || (!seoSettings.title && !seoSettings.metaTitle) || !seoSettings.focusKeywords}
-                className="w-full text-white bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-600 hover:to-cyan-600"
+                className="w-full btn btn-primary"
                 aria-label={
                   (!mainContent || (!seoSettings.title && !seoSettings.metaTitle) || !seoSettings.focusKeywords)
                   ? "First generate post content and set title/keywords"
@@ -1553,14 +1553,14 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             <TextInput label="Tags" name="tags" value={seoSettings.tags} onChange={handleSeoInputChange} placeholder="e.g., blogging, AI, SEO (comma-separated)" />
           </SectionCard>
 
-          <SectionCard title="Link Integration (Optional)" icon={<LinkIcon className="w-6 h-6 text-sky-600"/>} startOpen={false}>
+          <SectionCard title="Link Integration (Optional)" icon={<LinkIcon className="w-6 h-6 text-place-teal"/>} startOpen={false}>
               <p className="text-xs text-gray-500 mb-3">AI will attempt to contextually integrate these links into the blog content.</p>
               
               <div className="mb-4 border-b border-gray-200 pb-4">
                   <Button
                       onClick={handleSuggestInternalLinks}
                       disabled={anyLoading || !mainContent || !activeWriterProfile?.websiteContext}
-                      className="w-full text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600"
+                      className="w-full btn btn-primary"
                       aria-label={!activeWriterProfile?.websiteContext ? "Requires an active profile with Website Context Engine setup" : "Suggest Internal Links with AI"}
                   >
                       <SparklesIcon className="w-5 h-5 mr-2" />
@@ -1586,7 +1586,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
               ))}
           </SectionCard>
           
-          <SectionCard title="External Link Suggester" icon={<ArrowTopRightOnSquareIcon className="w-6 h-6 text-blue-600"/>} startOpen={false}>
+          <SectionCard title="External Link Suggester" icon={<ArrowTopRightOnSquareIcon className="w-6 h-6 text-place-teal"/>} startOpen={false}>
               {externalLinkError && (
                   <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-md mb-4 text-sm" role="alert">
                       {externalLinkError}
@@ -1609,7 +1609,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
               <Button
                   onClick={handleSuggestExternalLinks}
                   disabled={anyLoading || !mainContent}
-                  className="w-full text-white bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600"
+                  className="w-full btn btn-primary"
               >
                   <SparklesIcon className="w-5 h-5 mr-2" />
                   {isSuggestingExternalLinks ? 'Finding Links...' : 'Find External Link Opportunities'}
@@ -1627,15 +1627,15 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                               <li key={index} className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
                                   <p className="text-sm text-gray-600 mb-2 italic" dangerouslySetInnerHTML={{ __html: `Context: "${suggestion.context.replace(suggestion.anchorText, `<strong>${suggestion.anchorText}</strong>`)}"` }} />
                                   <p className="text-sm text-gray-800 mb-1">
-                                      <strong>Anchor:</strong> <span className="font-medium text-blue-700">{suggestion.anchorText}</span>
+                                      <strong>Anchor:</strong> <span className="font-medium text-place-teal">{suggestion.anchorText}</span>
                                   </p>
                                   <p className="text-sm text-gray-800 mb-3 break-words">
-                                      <strong>URL:</strong> <a href={suggestion.url} target="_blank" rel="noopener noreferrer" className="text-sky-600 hover:underline">{suggestion.url}</a>
+                                      <strong>URL:</strong> <a href={suggestion.url} target="_blank" rel="noopener noreferrer" className="text-place-teal hover:underline">{suggestion.url}</a>
                                   </p>
                                   <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mt-3">
                                       <Button
                                           onClick={() => handleAddExternalLink(suggestion)}
-                                          className="w-full text-xs py-1.5 bg-green-500 hover:bg-green-600 text-white"
+                                          className="w-full text-xs py-1.5 btn btn-success"
                                       >
                                           Add to Post
                                       </Button>
@@ -1643,7 +1643,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                                           href={suggestion.url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="w-full text-xs py-1.5 bg-gray-500 hover:bg-gray-600 text-white px-4 font-semibold rounded-md shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white transition-all duration-150 ease-in-out flex items-center justify-center"
+                                          className="w-full text-xs py-1.5 btn btn-secondary"
                                       >
                                           Verify Link <ArrowTopRightOnSquareIcon className="w-4 h-4 ml-1.5"/>
                                       </a>
@@ -1663,17 +1663,17 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             />
           )}
 
-          <SectionCard title="Live Blog Preview" icon={<DocumentTextIcon className="w-6 h-6 text-sky-600"/>} >
+          <SectionCard title="Live Blog Preview" icon={<DocumentTextIcon className="w-6 h-6 text-place-teal"/>} >
             <div className="bg-white p-6 rounded-md shadow-lg min-h-[600px] text-gray-800 overflow-y-auto max-h-[calc(100vh-150px)] border border-gray-200">
               {seoSettings.title && <h1 className="text-3xl font-bold mb-4 text-gray-900">{seoSettings.title}</h1>}
               <BlogPreview content={mainContent} />
             </div>
           </SectionCard>
 
-          <SectionCard title="Manager Approval" icon={<ShieldCheckIcon className="w-6 h-6 text-amber-600"/>}>
+          <SectionCard title="Manager Approval" icon={<ShieldCheckIcon className="w-6 h-6 text-place-teal"/>}>
             <div className="mb-3">
                 {approvalStatus === 'pending' && (
-                    <p className="text-amber-700 flex items-center"><UserCircleIcon className="w-5 h-5 mr-2 text-amber-600"/>Status: Pending Review & Approval.</p>
+                    <p className="text-black flex items-center"><UserCircleIcon className="w-5 h-5 mr-2 text-black"/>Status: Pending Review & Approval.</p>
                 )}
                 {approvalStatus === 'approved' && approvalTimestamp && (
                     <p className="text-green-600 flex items-center"><CheckCircleIcon className="w-5 h-5 mr-2 text-green-600"/>Status: Approved on {approvalTimestamp}.</p>
@@ -1710,7 +1710,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                   <Button
                     onClick={handleApproveAttempt}
                     disabled={anyLoading}
-                    className="flex-1 bg-green-500 hover:bg-green-600 text-white"
+                    className="flex-1 btn btn-success"
                     aria-label="Approve Content"
                   >
                     <CheckCircleIcon className="w-5 h-5 mr-2"/> Approve Content
@@ -1718,8 +1718,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                   <Button
                     onClick={handleRejectContent}
                     disabled={anyLoading || !rejectionReasonInput.trim()}
-                    variant="danger"
-                    className="flex-1"
+                    className="flex-1 btn btn-danger"
                     aria-label="Reject Content"
                   >
                     <XCircleIcon className="w-5 h-5 mr-2"/> Reject Content
@@ -1732,7 +1731,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
               )}
           </SectionCard>
           
-          <SectionCard title="Feature Image Generator" icon={<ImageIcon className="w-6 h-6 text-teal-600"/>} startOpen={false}>
+          <SectionCard title="Feature Image Generator" icon={<ImageIcon className="w-6 h-6 text-place-teal"/>} startOpen={false}>
             {imageGenError && (
               <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-md mb-4 text-sm" role="alert">
                 {imageGenError}
@@ -1742,7 +1741,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             <Button
               onClick={handleGenerateImagePromptIdea}
               disabled={anyLoading || !mainContent || approvalStatus !== 'approved'}
-              className="w-full mb-3 bg-teal-500 hover:bg-teal-600 text-white"
+              className="w-full mb-3 btn btn-primary"
               aria-label={approvalStatus !== 'approved' ? "Content must be approved by manager to generate image prompt" : "Suggest Image Prompt Idea"}
             >
               {isGeneratingPrompt ? 'Generating Idea...' : 'Suggest Image Prompt Idea'}
@@ -1769,7 +1768,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             <Button
               onClick={handleRefineImagePrompt}
               disabled={anyLoading || !imagePrompt || !imageRefinementInput || approvalStatus !== 'approved'}
-              className="w-full mb-4 bg-sky-500 hover:bg-sky-600 text-white text-sm py-2"
+              className="w-full mb-4 btn btn-primary text-sm py-2"
               aria-label={approvalStatus !== 'approved' ? "Content must be approved by manager to refine prompt" : "Refine Prompt with AI"}
             >
               {isRefiningPrompt ? 'Refining...' : 'Refine Prompt with AI'}
@@ -1777,7 +1776,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             <Button
               onClick={handleGenerateFinalImage}
               disabled={anyLoading || !imagePrompt || approvalStatus !== 'approved'}
-              className="w-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white"
+              className="w-full btn btn-primary"
               aria-label={approvalStatus !== 'approved' ? "Content must be approved by manager to generate image" : "Generate Feature Image"}
             >
               <ImageIcon className="w-5 h-5 mr-2"/> {isGeneratingImage ? 'Generating Image...' : 'Generate Feature Image'}
@@ -1794,7 +1793,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                 />
                 <Button
                   onClick={handleDownloadImage}
-                  className="w-full bg-green-500 hover:bg-green-600 text-white"
+                  className="w-full btn btn-success"
                 >
                   <DownloadIcon className="w-5 h-5 mr-2"/> Download Image
                 </Button>
@@ -1802,7 +1801,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             )}
           </SectionCard>
 
-          <SectionCard title="Social Post Generator" icon={<ShareIcon className="w-6 h-6 text-indigo-600"/>} startOpen={false}>
+          <SectionCard title="Social Post Generator" icon={<ShareIcon className="w-6 h-6 text-place-teal"/>} startOpen={false}>
             {socialPostError && (
               <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-md mb-4 text-sm" role="alert">
                 {socialPostError}
@@ -1832,7 +1831,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             <Button
               onClick={handleGenerateSocialPosts}
               disabled={anyLoading || !mainContent || !seoSettings.title || !seoSettings.blogPostUrl || !seoSettings.slug || approvalStatus !== 'approved'}
-              className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white"
+              className="w-full btn btn-primary"
               aria-label={
                 approvalStatus !== 'approved' ? "Content must be approved by manager to generate social posts" :
                 (!mainContent || !seoSettings.title || !seoSettings.blogPostUrl || !seoSettings.slug)
@@ -1854,7 +1853,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                     <p className="text-sm whitespace-pre-wrap mb-2 text-gray-800">{post}</p>
                     <Button
                       onClick={() => copyToClipboard(post, `Social post suggestion ${index + 1}`)}
-                      className="w-full text-xs py-1.5 bg-gray-500 hover:bg-gray-600 text-white"
+                      className="w-full text-xs py-1.5 btn btn-secondary"
                       variant="secondary"
                     >
                       <CopyIcon className="w-4 h-4 mr-1.5"/> Copy Suggestion {index + 1}
@@ -1869,7 +1868,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
       {activeTab === 'topics' && (
         <div className="max-w-4xl mx-auto">
-          <SectionCard title="Topic Finder & Research" icon={<GlobeAltIcon className="w-6 h-6 text-sky-600"/>}>
+          <SectionCard title="Topic Finder & Research" icon={<GlobeAltIcon className="w-6 h-6 text-place-teal"/>}>
             <TopicFinder
               onSetDeepResearchInfo={handleSetDeepResearchInfo}
               onHeadlineResearchComplete={handleHeadlineResearchComplete}
@@ -1898,7 +1897,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
       {activeTab === 'profiles' && (
         <div className="max-w-4xl mx-auto">
-          <SectionCard title="AI Writer Profile Management" icon={<UserCircleIcon className="w-6 h-6 text-sky-600"/>}>
+          <SectionCard title="AI Writer Profile Management" icon={<UserCircleIcon className="w-6 h-6 text-place-teal"/>}>
             <WriterProfileManager
               profiles={writerProfiles}
               setProfiles={setWriterProfiles}
@@ -1910,7 +1909,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
       {activeTab === 'blogs' && (
         <div className="max-w-4xl mx-auto">
-          <SectionCard title="Saved Blog Posts" icon={<BookmarkSquareIcon className="w-6 h-6 text-sky-600"/>}>
+          <SectionCard title="Saved Blog Posts" icon={<BookmarkSquareIcon className="w-6 h-6 text-place-teal"/>}>
             <SavedBlogsManager
               currentUser={currentUser}
               onLoadBlog={handleLoadBlog}
