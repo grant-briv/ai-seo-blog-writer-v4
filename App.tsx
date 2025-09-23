@@ -1289,13 +1289,15 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                 <p className="text-sm text-gray-700">Welcome, <strong className="font-semibold">{currentUser.username}</strong></p>
                 <p className="text-xs text-gray-500 capitalize">{currentUser.role} Access</p>
             </div>
-            <Button 
-                onClick={() => setCurrentView('admin')} 
-                className="btn btn-outline !p-2"
-                aria-label="Open Settings"
-            >
-                <CogIcon className="w-6 h-6" />
-            </Button>
+            {currentUser.role === 'admin' && (
+              <Button 
+                  onClick={() => setCurrentView('admin')} 
+                  className="btn btn-outline !p-2"
+                  aria-label="Open Settings"
+              >
+                  <CogIcon className="w-6 h-6" />
+              </Button>
+            )}
              <Button onClick={onLogout} variant="secondary" className="text-sm !py-2 !px-3">Logout</Button>
         </div>
       </header>
