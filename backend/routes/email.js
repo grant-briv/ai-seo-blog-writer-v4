@@ -322,7 +322,11 @@ router.post('/password-reset', async (req, res) => {
       console.log('👥 Found', adminUsers.length, 'admin users');
     } catch (error) {
       console.error('❌ Error fetching admin users:', error);
-      return res.status(500).json({ error: 'Database error while fetching admin configuration' });
+      return res.status(500).json({ 
+        error: 'Database error while fetching admin configuration', 
+        details: error.message,
+        step: 'admin_users_query'
+      });
     }
     
     if (adminUsers.length === 0) {
@@ -341,7 +345,11 @@ router.post('/password-reset', async (req, res) => {
       console.log('⚙️ Found', emailSettings.length, 'email settings for admin');
     } catch (error) {
       console.error('❌ Error fetching email settings:', error);
-      return res.status(500).json({ error: 'Database error while fetching email configuration' });
+      return res.status(500).json({ 
+        error: 'Database error while fetching email configuration', 
+        details: error.message,
+        step: 'email_settings_query'
+      });
     }
     
     const settingsMap = {};
@@ -408,7 +416,9 @@ router.post('/password-reset', async (req, res) => {
     console.error('Failed to send password reset email:', error);
     res.status(500).json({ 
       error: 'Failed to send password reset email', 
-      details: error.message 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      step: 'unknown'
     });
   }
 });
