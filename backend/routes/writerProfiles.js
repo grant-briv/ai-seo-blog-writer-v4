@@ -165,6 +165,15 @@ router.put('/:id', async (req, res) => {
       });
     }
 
+    // Admin users can update any profile, regular users can only update their own
+    const isAdmin = req.user.role === 'admin';
+    const whereCondition = isAdmin 
+      ? eq(writerProfiles.id, profileId)
+      : and(
+          eq(writerProfiles.id, profileId),
+          eq(writerProfiles.ownerId, userId)
+        );
+
     const updatedProfile = await db
       .update(writerProfiles)
       .set({
@@ -172,12 +181,7 @@ router.put('/:id', async (req, res) => {
         profileData: restProfileData,
         updatedAt: new Date()
       })
-      .where(
-        and(
-          eq(writerProfiles.id, profileId),
-          eq(writerProfiles.ownerId, userId)
-        )
-      )
+      .where(whereCondition)
       .returning();
 
     if (updatedProfile.length === 0) {
@@ -221,14 +225,18 @@ router.delete('/:id', async (req, res) => {
 
     console.log(`📝 Deleting writer profile ${profileId} for user: ${userId}`);
 
-    const deletedProfile = await db
-      .delete(writerProfiles)
-      .where(
-        and(
+    // Admin users can delete any profile, regular users can only delete their own
+    const isAdmin = req.user.role === 'admin';
+    const whereCondition = isAdmin 
+      ? eq(writerProfiles.id, profileId)
+      : and(
           eq(writerProfiles.id, profileId),
           eq(writerProfiles.ownerId, userId)
-        )
-      )
+        );
+
+    const deletedProfile = await db
+      .delete(writerProfiles)
+      .where(whereCondition)
       .returning();
 
     if (deletedProfile.length === 0) {
