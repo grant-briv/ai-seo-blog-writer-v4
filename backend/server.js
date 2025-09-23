@@ -121,6 +121,8 @@ app.use('/api/writer-profiles', authenticateToken, writerProfileRoutes);
 app.use('/api/user-settings', authenticateToken, userSettingsRoutes);
 app.use('/api/saved-blogs', authenticateToken, savedBlogsRoutes);
 app.use('/api/topic-searches', authenticateToken, topicSearchesRoutes);
+// Email routes - password reset needs to be public, others need auth
+app.use('/api/email/password-reset', emailRoutes);
 app.use('/api/email', authenticateToken, emailRoutes);
 
 // Serve static frontend files in production
