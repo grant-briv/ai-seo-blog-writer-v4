@@ -288,19 +288,37 @@ router.post('/password-reset', async (req, res) => {
       return res.status(400).json({ error: 'Email address is required' });
     }
     
+    console.log('🔍 Fetching admin email configuration for password reset...');
+    
     // Get email configuration from admin user settings
     // Find admin user first
-    const adminUsers = await req.app.locals.db.select().from(req.app.locals.schema.users).where(req.app.locals.schema.users.role.eq('admin'));
+    let adminUsers;
+    try {
+      adminUsers = await req.app.locals.db.select().from(req.app.locals.schema.users).where(req.app.locals.schema.users.role.eq('admin'));
+      console.log('👥 Found', adminUsers.length, 'admin users');
+    } catch (error) {
+      console.error('❌ Error fetching admin users:', error);
+      return res.status(500).json({ error: 'Database error while fetching admin configuration' });
+    }
     
     if (adminUsers.length === 0) {
+      console.error('❌ No admin user found for email configuration');
       return res.status(500).json({ error: 'No admin user found to configure email service' });
     }
     
     const adminUser = adminUsers[0]; // Use first admin user
+    console.log('👤 Using admin user:', adminUser.username, 'for email config');
     
     // Get email settings for admin user
-    const emailSettings = await req.app.locals.db.select().from(req.app.locals.schema.userSettings)
-      .where(req.app.locals.schema.userSettings.userId.eq(adminUser.id));
+    let emailSettings;
+    try {
+      emailSettings = await req.app.locals.db.select().from(req.app.locals.schema.userSettings)
+        .where(req.app.locals.schema.userSettings.userId.eq(adminUser.id));
+      console.log('⚙️ Found', emailSettings.length, 'email settings for admin');
+    } catch (error) {
+      console.error('❌ Error fetching email settings:', error);
+      return res.status(500).json({ error: 'Database error while fetching email configuration' });
+    }
     
     const settingsMap = {};
     emailSettings.forEach(setting => {
@@ -314,7 +332,15 @@ router.post('/password-reset', async (req, res) => {
       isEnabled: settingsMap.emailIsEnabled === 'true'
     };
     
+    console.log('📧 Email config status:', {
+      hasApiKey: !!emailConfig.apiKey,
+      hasDomain: !!emailConfig.domain,
+      hasFromEmail: !!emailConfig.fromEmail,
+      isEnabled: emailConfig.isEnabled
+    });
+    
     if (!emailConfig.isEnabled || !emailConfig.apiKey || !emailConfig.domain || !emailConfig.fromEmail) {
+      console.error('❌ Email service not properly configured');
       return res.status(400).json({ error: 'Email service not configured. Please contact your administrator.' });
     }
     
