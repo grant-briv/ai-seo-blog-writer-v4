@@ -307,12 +307,7 @@ router.post('/password-reset', async (req, res) => {
       return res.status(500).json({ error: 'Database not available' });
     }
     
-    if (!req.app.locals.schema) {
-      console.error('❌ Database schema not available in app.locals');
-      return res.status(500).json({ error: 'Database schema not available' });
-    }
-    
-    console.log('✅ Database and schema available, proceeding...');
+    console.log('✅ Database available, proceeding with schema imports...');
     
     // Get email configuration from admin user settings
     // Find admin user first

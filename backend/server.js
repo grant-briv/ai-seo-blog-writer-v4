@@ -68,8 +68,9 @@ async function initializeDatabase() {
     await migrate(db, { migrationsFolder: './db/migrations' });
     console.log('✅ Database migrations completed');
     
-    // Make db available to routes
+    // Make db and schema available to routes
     app.locals.db = db;
+    app.locals.schema = schema;
     
     console.log('✅ Database connected successfully');
   } catch (error) {
