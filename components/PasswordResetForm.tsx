@@ -33,6 +33,7 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({ onResetComplete }
     try {
       setIsVerifying(true);
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      console.log('🔗 Password reset using API URL:', baseUrl);
       
       const response = await fetch(`${baseUrl}/api/auth/verify-reset-token`, {
         method: 'POST',
@@ -79,6 +80,7 @@ const PasswordResetForm: React.FC<PasswordResetFormProps> = ({ onResetComplete }
 
     try {
       const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      console.log('🔗 Password reset completion using API URL:', baseUrl);
       
       const response = await fetch(`${baseUrl}/api/auth/reset-password`, {
         method: 'POST',
