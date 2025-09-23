@@ -1,6 +1,8 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import crypto from 'crypto';
+import { eq } from 'drizzle-orm';
+import { users, userSettings } from '../../db/schema.ts';
 
 const router = express.Router();
 
@@ -288,13 +290,26 @@ router.post('/password-reset', async (req, res) => {
       return res.status(400).json({ error: 'Email address is required' });
     }
     
-    console.log('🔍 Fetching admin email configuration for password reset...');
+    console.log('🔍 Starting password reset for email:', email);
+    
+    // Check if database is available
+    if (!req.app.locals.db) {
+      console.error('❌ Database not available in app.locals');
+      return res.status(500).json({ error: 'Database not available' });
+    }
+    
+    if (!req.app.locals.schema) {
+      console.error('❌ Database schema not available in app.locals');
+      return res.status(500).json({ error: 'Database schema not available' });
+    }
+    
+    console.log('✅ Database and schema available, proceeding...');
     
     // Get email configuration from admin user settings
     // Find admin user first
     let adminUsers;
     try {
-      adminUsers = await req.app.locals.db.select().from(req.app.locals.schema.users).where(req.app.locals.schema.users.role.eq('admin'));
+      adminUsers = await req.app.locals.db.select().from(users).where(eq(users.role, 'admin'));
       console.log('👥 Found', adminUsers.length, 'admin users');
     } catch (error) {
       console.error('❌ Error fetching admin users:', error);
@@ -312,8 +327,8 @@ router.post('/password-reset', async (req, res) => {
     // Get email settings for admin user
     let emailSettings;
     try {
-      emailSettings = await req.app.locals.db.select().from(req.app.locals.schema.userSettings)
-        .where(req.app.locals.schema.userSettings.userId.eq(adminUser.id));
+      emailSettings = await req.app.locals.db.select().from(userSettings)
+        .where(eq(userSettings.userId, adminUser.id));
       console.log('⚙️ Found', emailSettings.length, 'email settings for admin');
     } catch (error) {
       console.error('❌ Error fetching email settings:', error);
@@ -345,26 +360,26 @@ router.post('/password-reset', async (req, res) => {
     }
     
     // Check if user exists
-    const users = await req.app.locals.db.select().from(req.app.locals.schema.users).where(req.app.locals.schema.users.email.eq(email));
+    const userList = await req.app.locals.db.select().from(users).where(eq(users.email, email));
     
-    if (users.length === 0) {
+    if (userList.length === 0) {
       // Don't reveal if user exists or not for security
       return res.json({ success: true, message: 'If an account with that email exists, a password reset link has been sent.' });
     }
     
-    const user = users[0];
+    const user = userList[0];
     
     // Generate password reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetExpiry = new Date(Date.now() + 3600000); // 1 hour from now
     
-    // Store reset token in database (you'll need to add these columns to users table)
-    await req.app.locals.db.update(req.app.locals.schema.users)
+    // Store reset token in database 
+    await req.app.locals.db.update(users)
       .set({ 
         resetToken: resetToken,
         resetTokenExpiry: resetExpiry 
       })
-      .where(req.app.locals.schema.users.id.eq(user.id));
+      .where(eq(users.id, user.id));
     
     // Create reset link
     const resetLink = `${req.headers.origin || 'https://seoblog.placetools.ai'}/reset-password?token=${resetToken}`;
