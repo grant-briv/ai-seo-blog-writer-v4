@@ -151,7 +151,22 @@ export const emailApiService = {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        console.error('❌ Password reset failed with status:', response.status, response.statusText);
+        
+        let errorData;
+        try {
+          const responseText = await response.text();
+          console.error('❌ Raw response:', responseText);
+          errorData = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('❌ Failed to parse error response:', parseError);
+          return {
+            success: false,
+            message: `HTTP ${response.status}: ${response.statusText}`,
+            details: 'Failed to parse error response'
+          };
+        }
+        
         console.error('❌ Password reset API error:', errorData);
         return {
           success: false,
