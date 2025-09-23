@@ -90,7 +90,11 @@ async function initializeDatabase() {
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'https://ai-seo-blog-writer-v4-production.up.railway.app'],
+  origin: process.env.FRONTEND_URL || [
+    'http://localhost:5173', 
+    'https://ai-seo-blog-writer-v4-production.up.railway.app',
+    'https://seoblog.placetools.ai'
+  ],
   credentials: true
 }));
 app.use(express.json());
