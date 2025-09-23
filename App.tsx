@@ -304,7 +304,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
 
   // Navigation state
   const [currentView, setCurrentView] = useState<'main' | 'admin'>('main');
-  const [activeTab, setActiveTab] = useState<'write' | 'topics' | 'keywords' | 'profiles' | 'blogs'>('write');
+  const [activeTab, setActiveTab] = useState<'write' | 'topics' | 'keywords' | 'profiles' | 'blogs'>('profiles');
 
   // Profiles state
   const [writerProfiles, setWriterProfiles] = useState<AiWriterProfile[]>([]);
@@ -1301,10 +1301,10 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
       </header>
       
       <nav className="flex flex-wrap items-center justify-center gap-2 mb-8 border-b border-gray-300 pb-4">
-          <TabButton tabId="write" onClick={() => setActiveTab('write')} icon={<DocumentTextIcon className="w-5 h-5" />} label="Write Blog" />
-          <TabButton tabId="topics" onClick={() => setActiveTab('topics')} icon={<GlobeAltIcon className="w-5 h-5" />} label="Find Topic" />
-          <TabButton tabId="keywords" onClick={() => setActiveTab('keywords')} icon={<LightBulbIcon className="w-5 h-5" />} label="Keyword Research" />
           <TabButton tabId="profiles" onClick={() => setActiveTab('profiles')} icon={<UserCircleIcon className="w-5 h-5" />} label="AI Writer Profiles" />
+          <TabButton tabId="keywords" onClick={() => setActiveTab('keywords')} icon={<LightBulbIcon className="w-5 h-5" />} label="Keyword Research" />
+          <TabButton tabId="topics" onClick={() => setActiveTab('topics')} icon={<GlobeAltIcon className="w-5 h-5" />} label="Find Topic" />
+          <TabButton tabId="write" onClick={() => setActiveTab('write')} icon={<DocumentTextIcon className="w-5 h-5" />} label="Write Blog" />
           <TabButton tabId="blogs" onClick={() => setActiveTab('blogs')} icon={<BookmarkSquareIcon className="w-5 h-5" />} label="Saved Blogs" />
       </nav>
 
