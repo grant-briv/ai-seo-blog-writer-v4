@@ -310,7 +310,7 @@ router.post('/password-reset', async (req, res) => {
     console.log('✅ Database available, proceeding with schema imports...');
     
     // Get email configuration from admin user settings
-    // Find admin user first
+    // Find admin user with email configuration
     let adminUsers;
     try {
       adminUsers = await req.app.locals.db.select().from(users).where(eq(users.role, 'admin'));
@@ -329,22 +329,36 @@ router.post('/password-reset', async (req, res) => {
       return res.status(500).json({ error: 'No admin user found to configure email service' });
     }
     
-    const adminUser = adminUsers[0]; // Use first admin user
-    console.log('👤 Using admin user:', adminUser.username, 'for email config');
+    // Find admin user with email settings
+    let adminUser = null;
+    let emailSettings = [];
     
-    // Get email settings for admin user
-    let emailSettings;
-    try {
-      emailSettings = await req.app.locals.db.select().from(userSettings)
-        .where(eq(userSettings.userId, adminUser.id));
-      console.log('⚙️ Found', emailSettings.length, 'email settings for admin');
-    } catch (error) {
-      console.error('❌ Error fetching email settings:', error);
-      return res.status(500).json({ 
-        error: 'Database error while fetching email configuration', 
-        details: error.message,
-        step: 'email_settings_query'
-      });
+    for (const user of adminUsers) {
+      try {
+        const settings = await req.app.locals.db.select().from(userSettings)
+          .where(eq(userSettings.userId, user.id));
+        
+        // Check if this admin has email settings
+        const hasEmailConfig = settings.some(setting => 
+          setting.key.startsWith('email') && setting.value
+        );
+        
+        if (hasEmailConfig) {
+          adminUser = user;
+          emailSettings = settings;
+          console.log('👤 Using admin user:', adminUser.username, 'for email config');
+          console.log('⚙️ Found', emailSettings.length, 'email settings for admin');
+          break;
+        }
+      } catch (error) {
+        console.error('❌ Error checking email settings for user:', user.username, error);
+        continue;
+      }
+    }
+    
+    if (!adminUser) {
+      console.error('❌ No admin user found with email configuration');
+      return res.status(500).json({ error: 'No admin user found with email configuration. Please configure email settings in the admin panel.' });
     }
     
     const settingsMap = {};

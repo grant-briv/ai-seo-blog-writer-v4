@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
+import { eq, and, gt } from 'drizzle-orm';
 import { users } from '../../db/schema.ts';
 import { generateToken } from '../middleware/auth.js';
 
@@ -208,6 +208,98 @@ router.post('/verify-token', async (req, res) => {
   } catch (error) {
     console.error('🔐 Token verification error:', error);
     res.status(401).json({ error: 'Invalid or expired token' });
+  }
+});
+
+// POST /api/auth/verify-reset-token - Verify password reset token
+router.post('/verify-reset-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ error: 'Reset token is required' });
+    }
+    
+    const db = req.app.locals.db;
+    
+    // Find user with valid reset token
+    const userResult = await db.select().from(users).where(
+      and(
+        eq(users.resetToken, token),
+        gt(users.resetTokenExpiry, new Date())
+      )
+    );
+    
+    if (userResult.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+    
+    const user = userResult[0];
+    
+    res.json({ 
+      success: true, 
+      message: 'Valid reset token',
+      email: user.email 
+    });
+    
+  } catch (error) {
+    console.error('🔐 Reset token verification error:', error);
+    res.status(500).json({ error: 'Failed to verify reset token' });
+  }
+});
+
+// POST /api/auth/reset-password - Complete password reset
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Reset token and new password are required' });
+    }
+    
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+    }
+    
+    const db = req.app.locals.db;
+    
+    // Find user with valid reset token
+    const userResult = await db.select().from(users).where(
+      and(
+        eq(users.resetToken, token),
+        gt(users.resetTokenExpiry, new Date())
+      )
+    );
+    
+    if (userResult.length === 0) {
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
+    
+    const user = userResult[0];
+    
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    
+    // Update password and clear reset token
+    await db.update(users)
+      .set({
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiry: null,
+        isTemporaryPassword: 'false'
+      })
+      .where(eq(users.id, user.id));
+    
+    console.log('🔐 Password reset completed for user:', user.username);
+    
+    res.json({ 
+      success: true, 
+      message: 'Password reset successfully. You can now log in with your new password.' 
+    });
+    
+  } catch (error) {
+    console.error('🔐 Password reset completion error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 

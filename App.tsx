@@ -3,6 +3,7 @@
 
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { TextInput } from './components/TextInput';
 import { TextAreaInput } from './components/TextAreaInput';
@@ -11,6 +12,7 @@ import { SectionCard } from './components/SectionCard';
 import { BlogPreview } from './components/BlogPreview';
 import { ContentEnhancementUI } from './components/ContentEnhancementUI';
 import { KeywordResearch } from './components/KeywordResearch';
+import PasswordResetForm from './components/PasswordResetForm';
 import {
   generateBlogPost,
   generateImprovedHeadline,
@@ -2060,9 +2062,16 @@ export const App: React.FC = () => {
     apiClient.logout(); // Clear API client token
   };
 
-  if (!currentUser) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
-
-  return <MainApplication currentUser={currentUser} onLogout={handleLogout} />;
+  return (
+    <Routes>
+      <Route path="/reset-password" element={<PasswordResetForm onResetComplete={() => setCurrentUser(null)} />} />
+      <Route path="/*" element={
+        !currentUser ? (
+          <LoginPage onLogin={handleLogin} />
+        ) : (
+          <MainApplication currentUser={currentUser} onLogout={handleLogout} />
+        )
+      } />
+    </Routes>
+  );
 }
