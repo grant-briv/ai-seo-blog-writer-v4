@@ -803,18 +803,28 @@ export async function generateTrendingQuestions(
 
   const baseSystemInstruction = `You are a content strategy expert specializing in SEO and viral content. Your task is to generate a list of 15 trending questions and headline ideas that consumers are asking related to a given topic.
   These should be phrased as engaging headlines for blog posts.
+
+  CRITICAL REQUIREMENT: EVERY headline MUST include the focus keyword/topic or a close variation of it. This is essential for SEO.
+
   You MUST respond with a single, clean JSON array of strings. Example: ["Headline 1", "Headline 2", ...].
   Do not add any commentary before or after the JSON. The array should contain exactly 15 strings.`;
 
   const userRequest = `
-  Topic: "${topic}"
+  Topic/Focus Keyword: "${topic}"
 
   Generate 15 trending questions and headline ideas. The ideas should cover a range of formats, such as "how-to" guides, listicles (e.g., "7 Ways to..."), comparison posts, and "why" explanations.
   The headlines should be compelling and designed to attract clicks.
-  
-  For example, if the topic is "real estate CRM", a related subtopic might be "How these 10 lead follow-up ideas can produce a 25% increase in closed sales".
 
-  Return your suggestions as a JSON array of 15 strings.
+  MANDATORY: Each headline MUST include the keyword "${topic}" or a close semantic variation of it for SEO purposes.
+
+  Examples if topic is "real estate CRM":
+  ✅ "How These 10 Real Estate CRM Features Can Increase Your Closed Sales by 25%"
+  ✅ "7 Ways a Real Estate CRM Transforms Your Lead Follow-Up Strategy"
+  ✅ "Why Every Real Estate Agent Needs a CRM in 2025"
+  ✅ "Real Estate CRM vs. Spreadsheets: Which is Better for Your Business?"
+  ❌ "10 Lead Follow-Up Ideas to Boost Sales" (missing keyword - DO NOT generate headlines like this)
+
+  Return your suggestions as a JSON array of 15 strings. Each headline MUST contain "${topic}" or a clear variation.
   `;
 
   const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'keywordAnalysis');
