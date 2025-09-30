@@ -212,9 +212,12 @@ router.put('/:id', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error updating writer profile:', error);
+    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error message:', error.message);
     res.status(500).json({
       success: false,
-      error: 'Failed to update writer profile'
+      error: 'Failed to update writer profile',
+      details: error.message // Add error details for debugging
     });
   }
 });
