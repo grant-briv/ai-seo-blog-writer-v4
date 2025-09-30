@@ -154,9 +154,12 @@ router.put('/:id', async (req, res) => {
     const profileData = req.body;
 
     console.log(`📝 Updating writer profile ${profileId} for user: ${userId}`);
+    console.log(`📝 Received profile data keys:`, Object.keys(profileData));
 
     // Extract fields that go in separate columns or should be excluded
     const { agentName, id, ownerId, createdAt, updatedAt, ...restProfileData } = profileData;
+
+    console.log(`📝 Profile data for JSONB:`, Object.keys(restProfileData));
 
     if (!agentName) {
       return res.status(400).json({
