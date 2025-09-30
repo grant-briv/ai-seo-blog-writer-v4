@@ -17,7 +17,7 @@ export function createDatabaseConnection() {
   
   const client = new Client({
     connectionString,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    ssl: connectionString.includes('railway.app') || connectionString.includes('rlwy.net') ? { rejectUnauthorized: false } : false,
   });
 
   // Connect the client
