@@ -1489,6 +1489,17 @@ Provide analysis in this JSON format:
   }
 }
 
+// Timeout wrapper to prevent hanging API calls
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => setTimeout(() => {
+      console.warn(`API call timed out after ${timeoutMs}ms, using fallback`);
+      resolve(fallback);
+    }, timeoutMs))
+  ]);
+}
+
 export async function performEnhancedTopicSearch(query: string): Promise<{
   articles: Article[];
   groundingSources: GroundingSource[];
@@ -1503,13 +1514,46 @@ export async function performEnhancedTopicSearch(query: string): Promise<{
   };
 }> {
   try {
-    // Run all searches in parallel for better performance
+    console.log('🔍 Starting enhanced topic search for:', query);
+
+    // Run searches in parallel with timeouts (30 seconds each)
+    // Reddit and Twitter are optional and will timeout gracefully
     const [newsResults, trendAnalysis, redditResults, twitterResults] = await Promise.all([
-      searchGoogleNews(query),
-      analyzeCurrentTrends(query),
-      searchRedditTrends(query),
-      searchTwitterTrends(query)
+      withTimeout(
+        searchGoogleNews(query),
+        30000,
+        { articles: [], groundingSources: [] }
+      ).then(result => {
+        console.log('✅ Google News search completed');
+        return result;
+      }),
+      withTimeout(
+        analyzeCurrentTrends(query),
+        30000,
+        { trendScore: 50, trendDirection: 'stable' as const, keyInsights: ['Trend analysis unavailable'] }
+      ).then(result => {
+        console.log('✅ Trend analysis completed');
+        return result;
+      }),
+      withTimeout(
+        searchRedditTrends(query),
+        20000,
+        []
+      ).then(result => {
+        console.log('✅ Reddit search completed (or timed out)');
+        return result;
+      }),
+      withTimeout(
+        searchTwitterTrends(query),
+        20000,
+        []
+      ).then(result => {
+        console.log('✅ Twitter search completed (or timed out)');
+        return result;
+      })
     ]);
+
+    console.log('🎉 Enhanced topic search completed');
 
     return {
       articles: newsResults.articles,
@@ -1521,6 +1565,7 @@ export async function performEnhancedTopicSearch(query: string): Promise<{
       }
     };
   } catch (error) {
+    console.error('❌ Enhanced topic search failed:', error);
     handleApiError(error, 'performEnhancedTopicSearch');
   }
 }
