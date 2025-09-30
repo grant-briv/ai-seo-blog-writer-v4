@@ -101,8 +101,8 @@ router.post('/', async (req, res) => {
     console.log(`📝 Creating writer profile for user: ${userId}`);
     console.log(`📝 Profile data:`, { agentName: profileData.agentName });
 
-    // Extract fields that go in separate columns
-    const { agentName, ...restProfileData } = profileData;
+    // Extract fields that go in separate columns or should be excluded
+    const { agentName, id, ownerId, createdAt, updatedAt, ...restProfileData } = profileData;
 
     if (!agentName) {
       return res.status(400).json({
@@ -155,8 +155,8 @@ router.put('/:id', async (req, res) => {
 
     console.log(`📝 Updating writer profile ${profileId} for user: ${userId}`);
 
-    // Extract fields that go in separate columns
-    const { agentName, ...restProfileData } = profileData;
+    // Extract fields that go in separate columns or should be excluded
+    const { agentName, id, ownerId, createdAt, updatedAt, ...restProfileData } = profileData;
 
     if (!agentName) {
       return res.status(400).json({
