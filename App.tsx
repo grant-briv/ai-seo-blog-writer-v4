@@ -400,10 +400,13 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
       if (currentUser.role === 'admin') {
           return writerProfiles;
       }
-      return writerProfiles.filter(p => 
-          p.ownerId === currentUser.id || 
-          (currentUser.assignedProfileIds && currentUser.assignedProfileIds.includes(p.id))
-      );
+      const assignedIds = Array.isArray(currentUser.assignedProfileIds) ? currentUser.assignedProfileIds : [];
+      return writerProfiles.filter(p => {
+          const isOwner = p.ownerId === currentUser.id;
+          const isAssigned = assignedIds.includes(p.id);
+          const isPublic = p.isPublic === true;
+          return isOwner || isAssigned || isPublic;
+      });
   }, [currentUser, writerProfiles]);
 
   const activeWriterProfile = useMemo(() => {

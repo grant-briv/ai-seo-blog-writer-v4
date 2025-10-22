@@ -1,6 +1,6 @@
 import express from 'express';
 import { eq, and } from 'drizzle-orm';
-import { writerProfiles } from '../../db/schema.ts';
+import { writerProfiles, users } from '../../db/schema.ts';
 
 const router = express.Router();
 
@@ -9,13 +9,36 @@ router.get('/', async (req, res) => {
   try {
     const db = req.app.locals.db;
     const userId = req.user.id;
+    const isAdmin = req.user.role === 'admin';
 
     console.log(`📝 Getting writer profiles for user: ${userId}`);
 
-    const profiles = await db
+    let assignedProfileIds = [];
+
+    if (!isAdmin) {
+      const userRecord = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+      
+      if (userRecord.length > 0 && Array.isArray(userRecord[0].assignedProfileIds)) {
+        assignedProfileIds = userRecord[0].assignedProfileIds.filter(Boolean);
+      }
+    }
+
+    const allProfiles = await db
       .select()
-      .from(writerProfiles)
-      .where(eq(writerProfiles.ownerId, userId));
+      .from(writerProfiles);
+
+    const profiles = isAdmin
+      ? allProfiles
+      : allProfiles.filter(profile => {
+          const profileData = profile.profileData || {};
+          const isProfilePublic = profileData.isPublic === true;
+          const isOwner = profile.ownerId === userId;
+          const isAssigned = assignedProfileIds.includes(profile.id);
+          return isOwner || isAssigned || isProfilePublic;
+        });
 
     console.log(`📝 Found ${profiles.length} writer profiles`);
 
@@ -47,6 +70,7 @@ router.get('/:id', async (req, res) => {
   try {
     const db = req.app.locals.db;
     const userId = req.user.id;
+    const isAdmin = req.user.role === 'admin';
     const profileId = req.params.id;
 
     console.log(`📝 Getting writer profile ${profileId} for user: ${userId}`);
@@ -54,12 +78,7 @@ router.get('/:id', async (req, res) => {
     const profiles = await db
       .select()
       .from(writerProfiles)
-      .where(
-        and(
-          eq(writerProfiles.id, profileId),
-          eq(writerProfiles.ownerId, userId)
-        )
-      );
+      .where(eq(writerProfiles.id, profileId));
 
     if (profiles.length === 0) {
       return res.status(404).json({
@@ -69,6 +88,32 @@ router.get('/:id', async (req, res) => {
     }
 
     const profile = profiles[0];
+
+    let assignedProfileIds = [];
+    if (!isAdmin) {
+      const userRecord = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+      
+      if (userRecord.length > 0 && Array.isArray(userRecord[0].assignedProfileIds)) {
+        assignedProfileIds = userRecord[0].assignedProfileIds.filter(Boolean);
+      }
+    }
+
+    const profileData = profile.profileData || {};
+    const canAccess = isAdmin ||
+      profile.ownerId === userId ||
+      assignedProfileIds.includes(profile.id) ||
+      profileData.isPublic === true;
+
+    if (!canAccess) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied to writer profile'
+      });
+    }
+
     const transformedProfile = {
       id: profile.id,
       ownerId: profile.ownerId,
