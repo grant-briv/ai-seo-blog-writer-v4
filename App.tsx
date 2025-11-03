@@ -33,14 +33,14 @@ import {
   WordpressIcon, CopyIcon, SparklesIcon, LightBulbIcon, DocumentTextIcon,
   SearchCircleIcon, CogIcon, UserCircleIcon, ArrowLeftIcon, ImageIcon, DownloadIcon,
   ShareIcon, LinkIcon, ChartBarIcon, TrendingUpIcon,
-  ShieldCheckIcon, CheckCircleIcon, XCircleIcon, DocumentDuplicateIcon, ArrowUpCircleIcon, BookmarkSquareIcon,
+  DocumentDuplicateIcon, ArrowUpCircleIcon, BookmarkSquareIcon,
   GlobeAltIcon,
   ArrowTopRightOnSquareIcon
 } from './components/Icons';
 import type {
   SeoSettings, BlogInputs, SuggestedSeoElements, AiWriterProfile,
   WriterProfileData, SocialMediaPlatformSelection, KeywordVolumeAnalysisResult,
-  ApprovalStatus, User, SavedBlogPost, SavedBlogState, ExternalLinkSuggestion
+  User, SavedBlogPost, SavedBlogState, ExternalLinkSuggestion
 } from './types';
 import { AdminPage } from './components/AdminPage';
 import { WriterProfileSelector } from './components/WriterProfileSelector';
@@ -317,8 +317,8 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [imageGenError, setImageGenError] = useState<string | null>(null);
 
-  const [selectedSocialPlatform, setSelectedSocialPlatform] = useState<SocialMediaPlatformSelection>(SOCIAL_MEDIA_PLATFORMS[0].id);
-  const [socialPostSuggestions, setSocialPostSuggestions] = useState<string[]>([]);
+  const [selectedSocialPlatforms, setSelectedSocialPlatforms] = useState<SocialMediaPlatformSelection[]>([]);
+  const [socialPostSuggestions, setSocialPostSuggestions] = useState<{ platform: string; posts: string[] }[]>([]);
   const [socialPostError, setSocialPostError] = useState<string | null>(null);
 
   const [keywordAnalysisResult, setKeywordAnalysisResult] = useState<KeywordVolumeAnalysisResult | null>(null);
@@ -327,14 +327,6 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
   
   const [externalLinkSuggestions, setExternalLinkSuggestions] = useState<ExternalLinkSuggestion[]>([]);
   const [externalLinkError, setExternalLinkError] = useState<string | null>(null);
-
-  // Approval state
-  const [approvalStatus, setApprovalStatus] = useState<ApprovalStatus>('pending');
-  const [approvalTimestamp, setApprovalTimestamp] = useState<string | null>(null);
-  const [rejectionReasonInput, setRejectionReasonInput] = useState<string>('');
-  const [currentRejectionReason, setCurrentRejectionReason] = useState<string | null>(null);
-  const [approvalError, setApprovalError] = useState<string | null>(null);
-  const [previousMainContentForApproval, setPreviousMainContentForApproval] = useState<string>('');
 
   // Saved blog state
   const [savedBlogId, setSavedBlogId] = useState<string | null>(null);
@@ -518,17 +510,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
         setKeywordDensity(null);
       }
     }
-
-    if (mainContent !== previousMainContentForApproval) {
-        if (approvalStatus === 'approved') {
-            setApprovalStatus('pending');
-            setApprovalTimestamp(null);
-            setCurrentRejectionReason(null);
-            setApprovalError("Content has changed since last approval. Re-approval required.");
-        }
-        setPreviousMainContentForApproval(mainContent);
-    }
-  }, [mainContent, seoSettings.focusKeywords, approvalStatus, previousMainContentForApproval]);
+  }, [mainContent, seoSettings.focusKeywords]);
 
 
   // Helper function to generate category and tag suggestions
@@ -565,18 +547,12 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
     }
     setIsLoading(true);
     setError(null);
-    setApprovalStatus('pending');
-    setApprovalTimestamp(null);
-    setCurrentRejectionReason(null);
-    setApprovalError(null);
-    setRejectionReasonInput('');
     setSavedBlogId(null); // New generation is a new blog
     try {
       const profileData = getActiveProfileData();
       const content = await generateBlogPost(seoSettings, blogInputs, profileData);
       setMainContent(content);
-      setPreviousMainContentForApproval(content);
-      
+
       // Auto-populate Blog Post Base URL from Profile
       if (activeWriterProfile?.websiteBlogUrl && !seoSettings.blogPostUrl) {
         setSeoSettings(prev => ({
@@ -667,24 +643,16 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
     }
   }, [mainContent, seoSettings.focusKeywords, seoSettings.title, seoSettings.metaTitle, getActiveProfileData]);
   
-  const copyToClipboard = useCallback((text: string, typeForAlert: string, requiresApproval: boolean = false) => {
-    if (requiresApproval && approvalStatus !== 'approved') {
-        alert("Content must be approved by a manager before copying this item.");
-        return;
-    }
+  const copyToClipboard = useCallback((text: string, typeForAlert: string) => {
     navigator.clipboard.writeText(text)
       .then(() => alert(`${typeForAlert} copied to clipboard!`))
       .catch(err => {
         console.error(`Failed to copy ${typeForAlert}: `, err);
         alert(`Failed to copy ${typeForAlert}. See console for details.`);
       });
-  }, [approvalStatus]);
+  }, []);
 
   const handleCopyToGoogleDocs = useCallback(async () => {
-    if (approvalStatus !== 'approved') {
-        alert("Content must be approved by a manager before copying for Google Docs.");
-        return;
-    }
     if (!mainContent) {
         alert("No content to copy.");
         return;
@@ -699,24 +667,24 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
         if (typeof ClipboardItem === "undefined") {
             throw new Error("ClipboardItem API is not supported in this browser.");
         }
-    
+
         const blobHtml = new Blob([finalHtmlForGDocs], { type: 'text/html' });
         const plainText = stripHtml(finalHtmlForGDocs);
         const blobText = new Blob([plainText], { type: 'text/plain' });
-        
+
         const clipboardItem = new ClipboardItem({
             'text/html': blobHtml,
             'text/plain': blobText,
         });
 
         await navigator.clipboard.write([clipboardItem]);
-        
+
         alert('Content copied for Google Docs! You can now paste it with formatting.');
     } catch (err) {
         console.error('Failed to copy for Google Docs: ', err);
         alert('Failed to copy content with formatting. This feature may not be supported by your browser. See console for details.');
     }
-  }, [mainContent, approvalStatus]);
+  }, [mainContent]);
 
   const handleGenerateImagePromptIdea = useCallback(async () => {
     if (!mainContent) {
@@ -801,10 +769,6 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
   }, [generatedImageUrl, seoSettings.slug]);
 
   const handleGenerateSocialPosts = useCallback(async () => {
-    if (approvalStatus !== 'approved') {
-        setSocialPostError("Blog content must be approved by a manager before generating social posts.");
-        return;
-    }
     if (!mainContent) {
       setSocialPostError("Please generate or write blog content first.");
       return;
@@ -821,19 +785,35 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
       setSocialPostError("Please ensure a Slug (URL part) is set or generated in SEO Settings.");
       return;
     }
+    if (selectedSocialPlatforms.length === 0) {
+      setSocialPostError("Please select at least one social media platform.");
+      return;
+    }
     setIsGeneratingSocial(true);
     setSocialPostError(null);
     setSocialPostSuggestions([]);
     try {
       const profileData = getActiveProfileData();
-      const platformInfo = SOCIAL_MEDIA_PLATFORMS.find(p => p.id === selectedSocialPlatform);
-      const posts = await generateSocialMediaPosts(
-        mainContent,
-        seoSettings,
-        platformInfo || SOCIAL_MEDIA_PLATFORMS[0],
-        profileData
-      );
-      setSocialPostSuggestions(posts);
+      const allPlatformPosts: { platform: string; posts: string[] }[] = [];
+
+      // Generate posts for each selected platform
+      for (const platformId of selectedSocialPlatforms) {
+        const platformInfo = SOCIAL_MEDIA_PLATFORMS.find(p => p.id === platformId);
+        if (platformInfo) {
+          const posts = await generateSocialMediaPosts(
+            mainContent,
+            seoSettings,
+            platformInfo,
+            profileData
+          );
+          allPlatformPosts.push({
+            platform: platformInfo.name,
+            posts
+          });
+        }
+      }
+
+      setSocialPostSuggestions(allPlatformPosts);
     } catch (err) {
       if (err instanceof RateLimitError) {
         setSocialPostError(err.message);
@@ -844,7 +824,7 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
     } finally {
       setIsGeneratingSocial(false);
     }
-  }, [mainContent, seoSettings, selectedSocialPlatform, getActiveProfileData, approvalStatus]);
+  }, [mainContent, seoSettings, selectedSocialPlatforms, getActiveProfileData]);
 
   const handleEstimateKeywordVolume = useCallback(async () => {
     if (!seoSettings.focusKeywords) {
@@ -901,25 +881,6 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
     alert(`"${newKeyword}" has been ${action} your focus keywords!`);
   }, []);
 
-  const handleApproveAttempt = useCallback(() => {
-    setApprovalError(null);
-    setApprovalStatus('approved');
-    setApprovalTimestamp(new Date().toLocaleString());
-    setCurrentRejectionReason(null);
-    setRejectionReasonInput('');
-  }, []);
-
-  const handleRejectContent = useCallback(() => {
-    if (!rejectionReasonInput.trim()){
-        setApprovalError("Please provide a reason for rejection.");
-        return;
-    }
-    setApprovalStatus('rejected');
-    setCurrentRejectionReason(rejectionReasonInput);
-    setApprovalTimestamp(null);
-    setApprovalError(null);
-  }, [rejectionReasonInput]);
-
   const handleImproveKeywordDensity = useCallback(async () => {
     if (!mainContent || !keywordDensity || !seoSettings.focusKeywords) {
       setError("Cannot improve density without content, focus keyword, and current density calculation.");
@@ -967,14 +928,10 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
         imagePrompt,
         imageRefinementInput,
         generatedImageUrl,
-        approvalStatus,
-        currentRejectionReason,
-        rejectionReasonInput,
-        approvalTimestamp,
         selectedWriterProfileId,
         keywordAnalysisResult,
         socialPostSuggestions,
-        selectedSocialPlatform,
+        selectedSocialPlatforms,
         externalLinkSuggestions,
     };
 
@@ -985,20 +942,19 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
         blogTitle: seoSettings.title || "Untitled Blog Post",
         appState: appStateToSave,
     };
-    
+
     saveBlogPost(blogPostToSave);
     setSavedBlogId(blogPostToSave.id);
     alert('Blog saved successfully!');
   }, [
     currentUser.id, savedBlogId, seoSettings, blogInputs, mainContent,
-    imagePrompt, imageRefinementInput, generatedImageUrl, approvalStatus,
-    currentRejectionReason, rejectionReasonInput, approvalTimestamp, selectedWriterProfileId,
-    keywordAnalysisResult, socialPostSuggestions, selectedSocialPlatform, externalLinkSuggestions
+    imagePrompt, imageRefinementInput, generatedImageUrl, selectedWriterProfileId,
+    keywordAnalysisResult, socialPostSuggestions, selectedSocialPlatforms, externalLinkSuggestions
   ]);
 
   const handleLoadBlog = useCallback((blogToLoad: SavedBlogPost) => {
     const { appState } = blogToLoad;
-    
+
     // Ensure backward compatibility for externalLinkKeywords
     const finalSeoSettings = {
         ...appState.seoSettings,
@@ -1011,16 +967,38 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
     setImagePrompt(appState.imagePrompt);
     setImageRefinementInput(appState.imageRefinementInput);
     setGeneratedImageUrl(appState.generatedImageUrl);
-    setApprovalStatus(appState.approvalStatus);
-    setCurrentRejectionReason(appState.currentRejectionReason);
-    setRejectionReasonInput(appState.rejectionReasonInput);
-    setApprovalTimestamp(appState.approvalTimestamp);
     setSelectedWriterProfileId(appState.selectedWriterProfileId);
     setKeywordAnalysisResult(appState.keywordAnalysisResult);
-    setSocialPostSuggestions(appState.socialPostSuggestions);
-    setSelectedSocialPlatform(appState.selectedSocialPlatform);
+
+    // Ensure backward compatibility for social post suggestions
+    // Old format: string[] -> New format: { platform: string; posts: string[] }[]
+    if (appState.socialPostSuggestions && Array.isArray(appState.socialPostSuggestions)) {
+      if (appState.socialPostSuggestions.length > 0 && typeof appState.socialPostSuggestions[0] === 'string') {
+        // Old format - convert to new format
+        setSocialPostSuggestions([{
+          platform: 'Legacy Posts',
+          posts: appState.socialPostSuggestions as string[]
+        }]);
+      } else {
+        // New format
+        setSocialPostSuggestions(appState.socialPostSuggestions as { platform: string; posts: string[] }[]);
+      }
+    } else {
+      setSocialPostSuggestions([]);
+    }
+
+    // Ensure backward compatibility for selected platforms
+    // Old format: single string -> New format: string[]
+    if ('selectedSocialPlatform' in appState && appState.selectedSocialPlatform) {
+      setSelectedSocialPlatforms([appState.selectedSocialPlatform as SocialMediaPlatformSelection]);
+    } else if ('selectedSocialPlatforms' in appState && appState.selectedSocialPlatforms) {
+      setSelectedSocialPlatforms(appState.selectedSocialPlatforms);
+    } else {
+      setSelectedSocialPlatforms([]);
+    }
+
     setExternalLinkSuggestions(appState.externalLinkSuggestions || []);
-    
+
     setSavedBlogId(blogToLoad.id);
     setActiveTab('write');
     alert(`Blog "${blogToLoad.blogTitle}" loaded successfully.`);
@@ -1559,25 +1537,22 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                     </Button>
                     <div className="flex space-x-3">
                         <Button
-                            onClick={() => copyToClipboard(mainContent, 'HTML Content', true)}
-                            disabled={!mainContent || approvalStatus !== 'approved'}
+                            onClick={() => copyToClipboard(mainContent, 'HTML Content')}
+                            disabled={!mainContent}
                             className="flex-1 bg-gray-600 hover:bg-gray-700 text-white"
-                            aria-label={approvalStatus !== 'approved' ? "Content must be approved by manager to copy HTML" : "Copy HTML Content"}
+                            aria-label="Copy HTML Content"
                         >
                             <CopyIcon className="w-5 h-5 mr-2"/> Copy HTML
                         </Button>
                         <Button
                             onClick={handleCopyToGoogleDocs}
-                            disabled={!mainContent || approvalStatus !== 'approved'}
+                            disabled={!mainContent}
                             className="flex-1 btn btn-primary"
-                            aria-label={approvalStatus !== 'approved' ? "Content must be approved by manager to copy for Google Docs" : "Copy for Google Docs"}
+                            aria-label="Copy for Google Docs"
                         >
                             <DocumentDuplicateIcon className="w-5 h-5 mr-2"/> Copy for GDocs
                         </Button>
                     </div>
-                    {approvalStatus !== 'approved' && mainContent && (
-                        <p className="text-xs text-yellow-600 text-center">Manager approval required to copy content.</p>
-                    )}
                 </div>
             </div>
           </SectionCard>
@@ -1746,66 +1721,6 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             </div>
           </SectionCard>
 
-          <SectionCard title="Manager Approval" icon={<ShieldCheckIcon className="w-6 h-6 text-place-teal"/>}>
-            <div className="mb-3">
-                {approvalStatus === 'pending' && (
-                    <p className="text-black flex items-center"><UserCircleIcon className="w-5 h-5 mr-2 text-black"/>Status: Pending Review & Approval.</p>
-                )}
-                {approvalStatus === 'approved' && approvalTimestamp && (
-                    <p className="text-green-600 flex items-center"><CheckCircleIcon className="w-5 h-5 mr-2 text-green-600"/>Status: Approved on {approvalTimestamp}.</p>
-                )}
-                {approvalStatus === 'rejected' && (
-                    <p className="text-red-600 flex items-center"><XCircleIcon className="w-5 h-5 mr-2 text-red-600"/>Status: Rejected. {currentRejectionReason && `Reason: ${currentRejectionReason}`}</p>
-                )}
-            </div>
-
-            {approvalError && (
-              <div className="bg-red-100 border border-red-300 text-red-700 px-3 py-2 rounded-md my-3 text-sm" role="alert">
-                {approvalError}
-                <button onClick={() => setApprovalError(null)} className="ml-2 text-red-500 hover:text-red-700 font-bold" aria-label="Clear approval error">&times;</button>
-              </div>
-            )}
-
-            {currentUser.role !== 'admin' && (approvalStatus === 'pending' || approvalStatus === 'rejected') && mainContent && (
-              <div className="text-sm text-center text-gray-600 bg-gray-100 p-4 rounded-md border">
-                Approval must be performed by an Administrator. Please ask an admin to log in and review the content.
-              </div>
-            )}
-
-            {currentUser.role === 'admin' && (approvalStatus === 'pending' || approvalStatus === 'rejected') && (
-              <div className="space-y-4 mt-4 border-t border-gray-300 pt-4">
-                <TextAreaInput
-                  label="Reason for Rejection (Required if rejecting)"
-                  name="rejectionReasonInput"
-                  value={rejectionReasonInput}
-                  onChange={(e) => setRejectionReasonInput(e.target.value)}
-                  placeholder="Provide feedback for rejection..."
-                  rows={3}
-                />
-                <div className="flex space-x-3">
-                  <Button
-                    onClick={handleApproveAttempt}
-                    disabled={anyLoading}
-                    className="flex-1 btn btn-success"
-                    aria-label="Approve Content"
-                  >
-                    <CheckCircleIcon className="w-5 h-5 mr-2"/> Approve Content
-                  </Button>
-                  <Button
-                    onClick={handleRejectContent}
-                    disabled={anyLoading || !rejectionReasonInput.trim()}
-                    className="flex-1 btn btn-danger"
-                    aria-label="Reject Content"
-                  >
-                    <XCircleIcon className="w-5 h-5 mr-2"/> Reject Content
-                  </Button>
-                </div>
-              </div>
-            )}
-              {approvalStatus === 'approved' && mainContent && (
-                  <p className="text-xs text-gray-500 mt-2">Content is approved. You can now copy the HTML or for Google Docs.</p>
-              )}
-          </SectionCard>
           
           <SectionCard title="Feature Image Generator" icon={<ImageIcon className="w-6 h-6 text-place-teal"/>} startOpen={false}>
             {imageGenError && (
@@ -1816,9 +1731,9 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             )}
             <Button
               onClick={handleGenerateImagePromptIdea}
-              disabled={anyLoading || !mainContent || approvalStatus !== 'approved'}
+              disabled={anyLoading || !mainContent}
               className="w-full mb-3 btn btn-primary"
-              aria-label={approvalStatus !== 'approved' ? "Content must be approved by manager to generate image prompt" : "Suggest Image Prompt Idea"}
+              aria-label="Suggest Image Prompt Idea"
             >
               {isGeneratingPrompt ? 'Generating Idea...' : 'Suggest Image Prompt Idea'}
             </Button>
@@ -1830,7 +1745,6 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
               placeholder="AI will suggest a prompt here, or write your own. Describe the desired image..."
               rows={4}
               className="mb-1 text-sm bg-gray-50 border-gray-300 focus:ring-teal-500 focus:border-teal-500 text-gray-900"
-              disabled={approvalStatus !== 'approved'}
             />
             <TextInput
               label="Refinement Instructions"
@@ -1839,27 +1753,23 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
               onChange={(e) => setImageRefinementInput(e.target.value)}
               placeholder="e.g., make it more vibrant, add a cat, change style to cartoon"
               className="mb-3 text-sm bg-gray-50 border-gray-300 focus:ring-teal-500 focus:border-teal-500 text-gray-900"
-              disabled={approvalStatus !== 'approved'}
             />
             <Button
               onClick={handleRefineImagePrompt}
-              disabled={anyLoading || !imagePrompt || !imageRefinementInput || approvalStatus !== 'approved'}
+              disabled={anyLoading || !imagePrompt || !imageRefinementInput}
               className="w-full mb-4 btn btn-primary text-sm py-2"
-              aria-label={approvalStatus !== 'approved' ? "Content must be approved by manager to refine prompt" : "Refine Prompt with AI"}
+              aria-label="Refine Prompt with AI"
             >
               {isRefiningPrompt ? 'Refining...' : 'Refine Prompt with AI'}
             </Button>
             <Button
               onClick={handleGenerateFinalImage}
-              disabled={anyLoading || !imagePrompt || approvalStatus !== 'approved'}
+              disabled={anyLoading || !imagePrompt}
               className="w-full btn btn-primary"
-              aria-label={approvalStatus !== 'approved' ? "Content must be approved by manager to generate image" : "Generate Feature Image"}
+              aria-label="Generate Feature Image"
             >
               <ImageIcon className="w-5 h-5 mr-2"/> {isGeneratingImage ? 'Generating Image...' : 'Generate Feature Image'}
             </Button>
-            {approvalStatus !== 'approved' && !generatedImageUrl && (
-                <p className="text-xs text-yellow-600 text-center mt-2">Manager approval required to use image generator.</p>
-            )}
             {generatedImageUrl && (
               <div className="mt-4 p-3 bg-gray-100 rounded-md border border-gray-200">
                 <img
@@ -1884,32 +1794,57 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
                 <button onClick={() => setSocialPostError(null)} className="ml-2 text-red-500 hover:text-red-700 font-bold" aria-label="Clear social post error">&times;</button>
               </div>
             )}
-            <div className="mb-3">
-              <label htmlFor="socialPlatform" className="block text-sm font-medium text-gray-700 mb-1">
-                Select Social Media Platform
-              </label>
-              <select
-                id="socialPlatform"
-                name="socialPlatform"
-                value={selectedSocialPlatform}
-                onChange={(e) => setSelectedSocialPlatform(e.target.value as SocialMediaPlatformSelection)}
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-md shadow-sm
-                            focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
-                disabled={approvalStatus !== 'approved'}
-              >
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Select Social Media Platforms
+                </label>
+                <Button
+                  onClick={() => {
+                    if (selectedSocialPlatforms.length === SOCIAL_MEDIA_PLATFORMS.length) {
+                      setSelectedSocialPlatforms([]);
+                    } else {
+                      setSelectedSocialPlatforms(SOCIAL_MEDIA_PLATFORMS.map(p => p.id));
+                    }
+                  }}
+                  className="text-xs !py-1 !px-2 btn btn-secondary"
+                  variant="secondary"
+                >
+                  {selectedSocialPlatforms.length === SOCIAL_MEDIA_PLATFORMS.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              </div>
+              <div className="space-y-2 bg-gray-50 p-3 rounded-md border border-gray-300">
                 {SOCIAL_MEDIA_PLATFORMS.map(platform => (
-                  <option key={platform.id} value={platform.id}>
-                    {platform.name} {platform.charLimit ? `(${platform.charLimit} chars)` : ''}
-                  </option>
+                  <label key={platform.id} className="flex items-start space-x-3 cursor-pointer hover:bg-gray-100 p-2 rounded">
+                    <input
+                      type="checkbox"
+                      checked={selectedSocialPlatforms.includes(platform.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedSocialPlatforms([...selectedSocialPlatforms, platform.id]);
+                        } else {
+                          setSelectedSocialPlatforms(selectedSocialPlatforms.filter(id => id !== platform.id));
+                        }
+                      }}
+                      className="mt-1 h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900">
+                        {platform.name} {platform.charLimit ? `(${platform.charLimit} chars)` : ''}
+                      </div>
+                      {platform.notes && (
+                        <div className="text-xs text-gray-500 mt-0.5">{platform.notes}</div>
+                      )}
+                    </div>
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
             <Button
               onClick={handleGenerateSocialPosts}
-              disabled={anyLoading || !mainContent || !seoSettings.title || !seoSettings.blogPostUrl || !seoSettings.slug || approvalStatus !== 'approved'}
+              disabled={anyLoading || !mainContent || !seoSettings.title || !seoSettings.blogPostUrl || !seoSettings.slug}
               className="w-full btn btn-primary"
               aria-label={
-                approvalStatus !== 'approved' ? "Content must be approved by manager to generate social posts" :
                 (!mainContent || !seoSettings.title || !seoSettings.blogPostUrl || !seoSettings.slug)
                 ? "Please provide Main Content, Blog Title, Base URL, and Slug for social posts"
                 : "Generate Social Posts"
@@ -1917,23 +1852,29 @@ const MainApplication: React.FC<{ currentUser: User; onLogout: () => void }> = (
             >
               <ShareIcon className="w-5 h-5 mr-2"/> {isGeneratingSocial ? 'Generating Posts...' : 'Generate Social Posts'}
             </Button>
-            {approvalStatus !== 'approved' && !socialPostSuggestions.length && (
-                <p className="text-xs text-yellow-600 text-center mt-2">Manager approval required to use social post generator.</p>
-            )}
 
             {socialPostSuggestions.length > 0 && (
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 space-y-4">
                 <h4 className="text-md font-semibold text-gray-700">Generated Suggestions:</h4>
-                {socialPostSuggestions.map((post, index) => (
-                  <div key={index} className="p-3 bg-gray-100 rounded-md border border-gray-200">
-                    <p className="text-sm whitespace-pre-wrap mb-2 text-gray-800">{post}</p>
-                    <Button
-                      onClick={() => copyToClipboard(post, `Social post suggestion ${index + 1}`)}
-                      className="w-full text-xs py-1.5 btn btn-secondary"
-                      variant="secondary"
-                    >
-                      <CopyIcon className="w-4 h-4 mr-1.5"/> Copy Suggestion {index + 1}
-                    </Button>
+                {socialPostSuggestions.map((platformData, platformIndex) => (
+                  <div key={platformIndex} className="border border-gray-300 rounded-lg overflow-hidden">
+                    <div className="bg-indigo-50 px-4 py-2 border-b border-gray-300">
+                      <h5 className="text-sm font-semibold text-indigo-900">{platformData.platform}</h5>
+                    </div>
+                    <div className="p-3 space-y-3">
+                      {platformData.posts.map((post, postIndex) => (
+                        <div key={postIndex} className="p-3 bg-gray-100 rounded-md border border-gray-200">
+                          <p className="text-sm whitespace-pre-wrap mb-2 text-gray-800">{post}</p>
+                          <Button
+                            onClick={() => copyToClipboard(post, `${platformData.platform} post ${postIndex + 1}`)}
+                            className="w-full text-xs py-1.5 btn btn-secondary"
+                            variant="secondary"
+                          >
+                            <CopyIcon className="w-4 h-4 mr-1.5"/> Copy {platformData.platform} Post {postIndex + 1}
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>

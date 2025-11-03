@@ -115,9 +115,6 @@ export interface KeywordVolumeAnalysisResult {
   suggestedKeywords: SuggestedKeyword[];
 }
 
-// For Manager Approval Workflow
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
-
 // For User Management
 export interface User {
   id: string;
@@ -148,14 +145,10 @@ export interface SavedBlogState {
   imagePrompt: string;
   imageRefinementInput: string;
   generatedImageUrl: string | null;
-  approvalStatus: ApprovalStatus;
-  currentRejectionReason: string | null;
-  rejectionReasonInput: string;
-  approvalTimestamp: string | null;
   selectedWriterProfileId: string | null;
   keywordAnalysisResult: KeywordVolumeAnalysisResult | null;
-  socialPostSuggestions: string[];
-  selectedSocialPlatform: SocialMediaPlatformSelection;
+  socialPostSuggestions: { platform: string; posts: string[] }[];
+  selectedSocialPlatforms: SocialMediaPlatformSelection[];
   externalLinkSuggestions: ExternalLinkSuggestion[];
 }
 
