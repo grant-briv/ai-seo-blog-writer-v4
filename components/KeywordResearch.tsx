@@ -158,19 +158,55 @@ export const KeywordResearch: React.FC<KeywordResearchProps> = ({ profileData, o
       // Step 2: Research all variations using Keywords Everywhere
       console.log('🔍 Researching keywords with Keywords Everywhere...');
 
-      // Combine seed keyword with variations (up to 200 total)
-      const allKeywords = [seedKeyword.trim(), ...variations].slice(0, 200);
+      // Combine seed keyword with variations (up to 100 for API limit)
+      const allKeywords = [seedKeyword.trim(), ...variations].slice(0, 100);
 
-      // Create a comma-separated list for the API
-      const keywordList = allKeywords.join(',');
-
-      const results = await keywordsEverywhereService.getRelatedKeywords(
-        keywordList,
+      // Get keyword data directly (not using getRelatedKeywords to avoid internal AI generation)
+      const keywordData = await keywordsEverywhereService.getKeywordData(
+        allKeywords,
         config,
-        country,
-        200
+        country
       );
-      console.log(`✅ Retrieved data for ${results.keywords.length} keywords`);
+
+      // Filter to only keywords with actual search volume
+      const keywordsWithData = keywordData.filter(k => k.vol !== null && k.vol !== undefined && k.vol > 0);
+
+      // Get seed keyword data
+      const seedData = keywordData.find(k => k.keyword.toLowerCase() === seedKeyword.trim().toLowerCase());
+
+      // Remove seed keyword from related results
+      const otherKeywords = keywordsWithData.filter(k =>
+        k.keyword.toLowerCase() !== seedKeyword.trim().toLowerCase()
+      );
+
+      // Categorize keywords
+      const questions = otherKeywords.filter(k =>
+        k.keyword.toLowerCase().includes('how') ||
+        k.keyword.toLowerCase().includes('what') ||
+        k.keyword.toLowerCase().includes('why') ||
+        k.keyword.toLowerCase().includes('when') ||
+        k.keyword.toLowerCase().includes('where') ||
+        k.keyword.toLowerCase().includes('?')
+      );
+
+      const regularKeywords = otherKeywords.filter(k => !questions.includes(k));
+
+      // Sort by search volume (highest first)
+      regularKeywords.sort((a, b) => (b.vol || 0) - (a.vol || 0));
+      questions.sort((a, b) => (b.vol || 0) - (a.vol || 0));
+
+      // Structure results
+      const results = {
+        seed_keyword: seedKeyword.trim(),
+        keywords: seedData ? [seedData] : [],
+        related_keywords: regularKeywords,
+        questions: questions,
+        total_results: keywordsWithData.length
+      };
+
+      console.log(`✅ Retrieved data for ${keywordsWithData.length} keywords (${Math.round(keywordsWithData.length / allKeywords.length * 100)}% success rate)`);
+      console.log(`   • Related keywords: ${regularKeywords.length}`);
+      console.log(`   • Question keywords: ${questions.length}`);
       setResearchResults(results);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to perform keyword research';
