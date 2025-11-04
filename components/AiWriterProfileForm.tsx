@@ -1,20 +1,19 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import type { AiWriterProfile, GoogleSearchConfig, KeywordsEverywhereConfig, KnowledgeDocument } from '../types';
+import type { AiWriterProfile, GoogleSearchConfig, KnowledgeDocument } from '../types';
 import { TextInput } from './TextInput';
 import { TextAreaInput } from './TextAreaInput';
 import { Button } from './Button';
 import { PlusCircleIcon, SaveIcon, SparklesIcon, GlobeAltIcon, BuildingLibraryIcon } from './Icons';
-import { 
-  AVAILABLE_TEXT_MODELS, 
-  KNOWLEDGE_BASE_MAX_CHARS, CHARS_PER_TOKEN_ESTIMATE, KNOWLEDGE_BASE_MAX_TOKENS_ESTIMATE, 
+import {
+  AVAILABLE_TEXT_MODELS,
+  KNOWLEDGE_BASE_MAX_CHARS, CHARS_PER_TOKEN_ESTIMATE, KNOWLEDGE_BASE_MAX_TOKENS_ESTIMATE,
   IMAGE_PROMPT_INSTRUCTIONS_MAX_CHARS, IMAGE_PROMPT_INSTRUCTIONS_MAX_TOKENS_ESTIMATE,
-  DEFAULT_TEXT_MODEL 
+  DEFAULT_TEXT_MODEL
 } from '../constants';
 import { generateWebsiteContext, RateLimitError } from '../services/geminiService';
 import { SectionCard } from './SectionCard';
 import GoogleSearchConfigComponent from './GoogleSearchConfig';
-import KeywordsEverywhereConfigComponent from './KeywordsEverywhereConfig';
 import { KnowledgeBaseManager } from './KnowledgeBaseManager';
 import { DocumentProcessingService } from '../services/documentProcessingService';
 
@@ -42,10 +41,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
 
   // Google Search Configuration state
   const [googleSearchConfig, setGoogleSearchConfig] = useState<GoogleSearchConfig | undefined>(undefined);
-  
-  // Keywords Everywhere Configuration state
-  const [keywordsEverywhereConfig, setKeywordsEverywhereConfig] = useState<KeywordsEverywhereConfig | undefined>(undefined);
-  
+
   // Profile visibility state
   const [isPublic, setIsPublic] = useState<boolean>(false);
   
@@ -66,7 +62,6 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       setWebsiteContext(profile.websiteContext || '');
       setWebsiteBlogUrl(profile.websiteBlogUrl || '');
       setGoogleSearchConfig(profile.googleSearchConfig);
-      setKeywordsEverywhereConfig(profile.keywordsEverywhereConfig);
       setKnowledgeDocuments(profile.knowledgeDocuments || []);
       setIsPublic(profile.isPublic || false);
       setUrlListInput(''); // Clear input on profile change
@@ -82,7 +77,6 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       setSitemapPages([]);
       setWebsiteContext('');
       setGoogleSearchConfig(undefined);
-      setKeywordsEverywhereConfig(undefined);
       setKnowledgeDocuments([]);
       setIsPublic(false);
     }
@@ -126,7 +120,7 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
       websiteContext,
       websiteBlogUrl,
       googleSearchConfig,
-      keywordsEverywhereConfig,
+      keywordsEverywhereConfig: profile?.keywordsEverywhereConfig, // Preserve existing config
       knowledgeDocuments,
       isPublic,
     });
@@ -142,7 +136,6 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
         setSitemapPages([]);
         setWebsiteContext('');
         setGoogleSearchConfig(undefined);
-        setKeywordsEverywhereConfig(undefined);
         setKnowledgeDocuments([]);
         setIsPublic(false);
     }
@@ -387,19 +380,6 @@ export const AiWriterProfileForm: React.FC<AiWriterProfileFormProps> = ({ profil
           <GoogleSearchConfigComponent
             config={googleSearchConfig}
             onConfigUpdate={setGoogleSearchConfig}
-          />
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Keyword Research Configuration" icon={<SparklesIcon className="w-6 h-6 text-blue-600"/>} startOpen={false}>
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Configure Keywords Everywhere API for advanced keyword research and analysis.
-          </p>
-          
-          <KeywordsEverywhereConfigComponent
-            config={keywordsEverywhereConfig}
-            onConfigUpdate={setKeywordsEverywhereConfig}
           />
         </div>
       </SectionCard>
