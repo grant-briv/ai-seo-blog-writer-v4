@@ -2,9 +2,10 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from './Button';
 import { TextInput } from './TextInput';
 import { SectionCard } from './SectionCard';
-import { SearchIcon, TrendingUpIcon, StarIcon } from './Icons';
+import { SearchIcon, TrendingUpIcon, StarIcon, SparklesIcon } from './Icons';
 import { keywordsEverywhereService, KeywordData, KeywordResearchResult } from '../services/keywordsEverywhereService';
 import type { WriterProfileData, KeywordsEverywhereConfig } from '../types';
+import { generateKeywordVariations } from '../services/geminiService';
 
 interface KeywordResearchProps {
   profileData?: WriterProfileData;
@@ -19,6 +20,8 @@ interface KeywordWithScore extends KeywordData {
 export const KeywordResearch: React.FC<KeywordResearchProps> = ({ profileData, onKeywordSelect }) => {
   const [seedKeyword, setSeedKeyword] = useState('');
   const [isResearching, setIsResearching] = useState(false);
+  const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
+  const [generatedVariations, setGeneratedVariations] = useState<string[]>([]);
   const [researchResults, setResearchResults] = useState<KeywordResearchResult | null>(null);
   const [selectedKeywords, setSelectedKeywords] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -139,24 +142,44 @@ export const KeywordResearch: React.FC<KeywordResearchProps> = ({ profileData, o
     }
 
     setIsResearching(true);
+    setIsGeneratingVariations(true);
     setError(null);
     setResearchResults(null);
+    setGeneratedVariations([]);
 
     try {
+      // Step 1: Use Gemini to generate keyword variations
+      console.log('🤖 Generating keyword variations with AI...');
+      const variations = await generateKeywordVariations(seedKeyword.trim(), profileData);
+      console.log(`✅ Generated ${variations.length} keyword variations`);
+      setGeneratedVariations(variations);
+      setIsGeneratingVariations(false);
+
+      // Step 2: Research all variations using Keywords Everywhere
+      console.log('🔍 Researching keywords with Keywords Everywhere...');
+
+      // Combine seed keyword with variations (up to 200 total)
+      const allKeywords = [seedKeyword.trim(), ...variations].slice(0, 200);
+
+      // Create a comma-separated list for the API
+      const keywordList = allKeywords.join(',');
+
       const results = await keywordsEverywhereService.getRelatedKeywords(
-        seedKeyword.trim(),
+        keywordList,
         config,
         country,
         200
       );
+      console.log(`✅ Retrieved data for ${results.keywords.length} keywords`);
       setResearchResults(results);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to perform keyword research';
       setError(errorMessage);
+      setIsGeneratingVariations(false);
     } finally {
       setIsResearching(false);
     }
-  }, [seedKeyword, activeConfig, country, isConfigured]);
+  }, [seedKeyword, activeConfig, country, isConfigured, profileData]);
 
   const handleKeywordSelect = (keyword: KeywordData) => {
     const newSelected = new Set(selectedKeywords);
@@ -329,8 +352,22 @@ export const KeywordResearch: React.FC<KeywordResearchProps> = ({ profileData, o
                 disabled={isResearching || !seedKeyword.trim()}
                 className="w-full btn btn-primary h-[42px]"
               >
-                <SearchIcon className="w-4 h-4 mr-2" />
-                {isResearching ? 'Researching...' : 'Research'}
+                {isGeneratingVariations ? (
+                  <>
+                    <SparklesIcon className="w-4 h-4 mr-2 animate-spin" />
+                    Generating AI Variations...
+                  </>
+                ) : isResearching ? (
+                  <>
+                    <SearchIcon className="w-4 h-4 mr-2" />
+                    Researching...
+                  </>
+                ) : (
+                  <>
+                    <SearchIcon className="w-4 h-4 mr-2" />
+                    Research with AI
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -342,6 +379,34 @@ export const KeywordResearch: React.FC<KeywordResearchProps> = ({ profileData, o
                 <div>
                   <h4 className="text-sm font-medium text-red-900">Error</h4>
                   <p className="text-sm text-red-800">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {generatedVariations.length > 0 && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-start">
+                <SparklesIcon className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-blue-900 mb-2">
+                    AI Generated {generatedVariations.length} Keyword Variations
+                  </h4>
+                  <p className="text-xs text-blue-800 mb-2">
+                    These variations were intelligently generated using AI and are now being researched for volume and competition data.
+                  </p>
+                  <details className="text-xs text-blue-700">
+                    <summary className="cursor-pointer hover:text-blue-900 font-medium">View generated keywords</summary>
+                    <div className="mt-2 max-h-32 overflow-y-auto bg-white rounded p-2 border border-blue-200">
+                      <div className="flex flex-wrap gap-1">
+                        {generatedVariations.map((kw, idx) => (
+                          <span key={idx} className="inline-block px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </details>
                 </div>
               </div>
             </div>

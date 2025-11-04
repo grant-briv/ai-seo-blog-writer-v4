@@ -559,6 +559,66 @@ Return the result as a single JSON object in the specified format.
   }
 }
 
+/**
+ * Generate intelligent keyword variations and related terms using AI
+ * This creates a more comprehensive list of keywords to research
+ */
+export async function generateKeywordVariations(
+  seedKeyword: string,
+  profileData?: WriterProfileData
+): Promise<string[]> {
+  const aiClient = await initializeAI();
+  const selectedModel = profileData?.selectedModel || DEFAULT_TEXT_MODEL;
+
+  const baseSystemInstruction = `You are an expert SEO keyword researcher specializing in generating comprehensive keyword variations and related terms.
+Your task is to analyze a seed keyword and generate a diverse list of keyword variations that would be valuable for SEO research.
+
+You MUST return a single, clean JSON object with an array of keywords. Do not add any conversational text, explanations, or markdown formatting.
+The JSON object must have this exact format:
+{
+  "keywords": [string, string, string, ...]
+}
+
+Generate keywords in these categories:
+1. **Exact match variations**: Different word orders, singular/plural forms
+2. **Long-tail variations**: 3-5 word phrases that include the seed keyword
+3. **Question-based**: "how to", "what is", "why is", "when to", "where to" variations
+4. **Intent modifiers**: Add words like "best", "top", "guide", "tips", "ideas", "strategies", "solutions"
+5. **Related terms**: Semantically related keywords and synonyms
+6. **Industry-specific**: Professional/technical variations
+7. **Local variations**: Include "near me", location-based if relevant
+8. **Action-oriented**: Keywords with "learn", "find", "get", "buy", "hire", etc.
+
+Generate 30-50 diverse keyword variations that would help discover valuable search opportunities.`;
+
+  const userRequest = `
+Seed Keyword: "${seedKeyword}"
+
+Generate a comprehensive list of keyword variations and related terms following the guidelines above.
+Focus on diversity and relevance. Include variations that target different search intents and user needs.
+
+Return the result as a JSON object with a "keywords" array.
+`;
+
+  const prompt = buildPromptWithProfile(baseSystemInstruction, userRequest, profileData, 'keywordAnalysis');
+
+  try {
+    const response = await aiClient.models.generateContent({
+      model: selectedModel,
+      contents: prompt,
+      config: { responseMimeType: "application/json" }
+    });
+
+    const result = parseJsonResponse<{ keywords: string[] }>(response.text, { keywords: [] });
+
+    // Return unique keywords, limit to 50
+    const uniqueKeywords = Array.from(new Set(result.keywords));
+    return uniqueKeywords.slice(0, 50);
+  } catch (error) {
+    handleApiError(error, 'generateKeywordVariations');
+  }
+}
+
 
 export async function improveKeywordDensity(
   mainContent: string,
@@ -1623,13 +1683,28 @@ Tags: tag1, tag2, tag3, tag4, tag5, tag6, tag7, tag8`;
     });
     
     console.log('🏷️ API response received:', response);
-    const text = response.text;
+
+    // Safely extract text from response
+    let text = '';
+    try {
+      text = response.response?.text() || response.text || '';
+    } catch (e) {
+      console.error('🏷️ Error extracting text from response:', e);
+      text = '';
+    }
+
     console.log('🏷️ Response text:', text);
+
+    // If no text, return empty values
+    if (!text) {
+      console.warn('🏷️ No text in response, returning empty categories/tags');
+      return { categories: '', tags: '' };
+    }
 
     // Parse the response
     const categoryMatch = text.match(/Categories:\s*([^\n]+)/i);
     const tagMatch = text.match(/Tags:\s*([^\n]+)/i);
-    
+
     const categories = categoryMatch ? categoryMatch[1].trim() : '';
     const tags = tagMatch ? tagMatch[1].trim() : '';
 
